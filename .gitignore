@@ -1,2 +1,49 @@
-# Google App Engine generated folder
-appengine-generated/
+CRITICAL SECURITY: Ignore environment variables (contains API keys, payment secrets)
+
+.env
+*.env
+*.key
+*.pem
+*.secret
+
+GENERAL OPERATING SYSTEM
+
+.DS_Store
+Thumbs.db
+
+BACKEND / NODE / NPM
+
+/node_modules
+/dist
+/build
+npm-debug.log
+yarn-error.log
+package-lock.json
+
+PYTHON
+
+pycache/
+*.pyc
+venv/
+.pytest_cache/
+
+MOBILE APP (React Native / Flutter / Android Studio)
+
+iOS Specific
+
+/mobile-app/ios/build/
+/mobile-app/ios/Pods/
+
+Android Specific
+
+/mobile-app/android/build/
+/mobile-app/android/.gradle/
+/mobile-app/android/app/build/
+/mobile-app/android/app/.cxx/
+
+LOGS AND TEMP FILES
+
+*.log
+*.tmp
+*.bak
+*.swp
