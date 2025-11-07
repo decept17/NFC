@@ -46,3 +46,7 @@ To clone this repository and begin development:
 3. Install Dependencies:
 
 > Navigate to the api/ and mobile-app/ folders and run the appropriate installation commands (e.g., npm install or pip install -r requirements.txt).
+
+## Project structure 
+
+![Layout & Purpose](image.png)
