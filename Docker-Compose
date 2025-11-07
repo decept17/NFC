@@ -1,0 +1,43 @@
+version: '3.8'
+
+services:
+  # 1. API Service (The Core Backend Logic)
+  api:
+    build: 
+      context: ./api
+      dockerfile: Dockerfile
+    container_name: nfc_api_service
+    # Map the container port 8080 to your host machine port 3000
+    ports:
+      - "3000:8080"
+    # Mount the local 'api' directory to enable hot-reloading during development
+    volumes:
+      - ./api:/usr/src/app
+      - /usr/src/app/node_modules # Avoid overwriting node_modules with host files
+    # Link to the database service
+    depends_on:
+      - db
+    environment:
+      # Inject environment variables for the API to connect to the DB
+      DATABASE_HOST: db
+      DATABASE_PORT: 5432
+      # CRITICAL: For security, use your host's .env file variables here
+      # Example: NODE_ENV: development
+      # Example: PAYMENT_GATEWAY_KEY: ${PAYMENT_GATEWAY_KEY}
+
+  # 2. Database Service (PostgreSQL - Used for Dev/Staging)
+  db:
+    image: postgres:16-alpine
+    container_name: nfc_postgres_db
+    ports:
+      - "5432:5432"
+    # Store persistent data in a named volume so it isn't lost when the container is stopped
+    volumes:
+      - postgres_data:/var/lib/postgresql/data/
+    environment:
+      POSTGRES_USER: nfcuser
+      POSTGRES_PASSWORD: nfcpassword # CHANGE THIS FOR PRODUCTION/STAGING
+      POSTGRES_DB: nfc_db
+
+volumes:
+  postgres_data:
