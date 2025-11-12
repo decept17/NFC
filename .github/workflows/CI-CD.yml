@@ -38,14 +38,16 @@ jobs:
         # You will replace 'echo' with your actual test command (e.g., 'npm test')
         run: echo "Running API unit tests..."
         
+      # FIX: Build the image with a simple, generic tag for local testing. 
+      # This bypasses the need for the DOCKER_USERNAME secret during the build/test phase.
       - name: Build Docker image
         id: docker_build
         uses: docker/build-push-action@v5
         with:
           context: ./api
           push: false
-          tags: ${{ secrets.DOCKER_USERNAME }}/nfc-api:${{ github.sha }}
-
+          tags: nfc-api:${{ github.sha }} # Changed from using secrets.DOCKER_USERNAME
+          
   deploy:
     # This deployment step only runs if the 'build-and-test' job succeeded 
     # and the trigger was a direct push to the 'main' branch (not a PR).
@@ -60,11 +62,13 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
           
+      # IMPORTANT: This step requires DOCKER_USERNAME and DOCKER_PASSWORD secrets to be set in GitHub.
       - name: Push Docker image to registry
         uses: docker/build-push-action@v5
         with:
           context: ./api
           push: true
+          # Use the full registry path for pushing
           tags: ${{ secrets.DOCKER_USERNAME }}/nfc-api:${{ github.sha }}
       
       - name: Deploy via SSH to Staging Server
