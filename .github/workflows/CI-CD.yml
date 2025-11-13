@@ -74,9 +74,8 @@ jobs:
 
     - name: Load Image into Docker
       run: |
-        # The artifact is downloaded into a directory with the artifact's name
         # We need to load the .tar file from inside that downloaded folder
-        docker load --input /tmp/nfc-api-image/nfc-api.tar
+        docker load --input /tmp/nfc-api.tar
 
     - name: Log in to Docker Hub
       uses: docker/login-action@v3
