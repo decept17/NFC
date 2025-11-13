@@ -46,7 +46,6 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: ./api 
-          file: Dockerfile
           push: false
           tags: nfc-api:${{ github.sha }} 
           # CRITICAL: Export the built image as a .tar file to the runner's temp directory
