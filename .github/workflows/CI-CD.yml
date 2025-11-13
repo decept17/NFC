@@ -37,16 +37,26 @@ jobs:
       - name: Run unit tests (Placeholder)
         # You will replace 'echo' with your actual test command (e.g., 'npm test')
         run: echo "Running API unit tests..."
-        
-      # FIX: Build the image with a simple, generic tag for local testing. 
-      # This bypasses the need for the DOCKER_USERNAME secret during the build/test phase.
-      - name: Build Docker image
+          
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and Export Docker Image
         id: docker_build
         uses: docker/build-push-action@v5
         with:
-          context: ./api
+          context: . # Use '.' because the working-directory for RUN commands is already './api'
           push: false
-          tags: nfc-api:${{ github.sha }} # Changed from using secrets.DOCKER_USERNAME
+          tags: nfc-api:${{ github.sha }} 
+          # CRITICAL: Export the built image as a .tar file to the runner's temp directory
+          outputs: type=docker,dest=/tmp/nfc-api.tar 
+          
+      - name: Upload Built Image as Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: nfc-api-image # This is the artifact name
+          path: /tmp/nfc-api.tar # This is the file to upload
+          retention-days: 1 # Optional: How long to keep the artifact
           
   deploy:
     # This deployment step only runs if the 'build-and-test' job succeeded 
@@ -56,24 +66,36 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
-      - name: Log in to Docker Hub
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
+    - name: Download Built Image Artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: nfc-api-image
+        path: /tmp # Downloads artifact to /tmp/nfc-api-image/nfc-api.tar
+
+    - name: Load Image into Docker
+      run: |
+        # The artifact is downloaded into a directory with the artifact's name
+        # We need to load the .tar file from inside that downloaded folder
+        docker load --input /tmp/nfc-api-image/nfc-api.tar
+
+    - name: Log in to Docker Hub
+      uses: docker/login-action@v3
+      with:
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_PASSWORD }}
           
-      # IMPORTANT: This step requires DOCKER_USERNAME and DOCKER_PASSWORD secrets to be set in GitHub.
-      - name: Push Docker image to registry
-        uses: docker/build-push-action@v5
-        with:
-          context: ./api
-          push: true
-          # Use the full registry path for pushing
-          tags: ${{ secrets.DOCKER_USERNAME }}/nfc-api:${{ github.sha }}
+    - name: Tag and Push Docker image to registry
+      run: |
+        # 1. Tag the image with the full registry path
+        DOCKER_IMAGE_TAG=${{ secrets.DOCKER_USERNAME }}/nfc-api:${{ github.sha }}
+        docker tag nfc-api:${{ github.sha }} $DOCKER_IMAGE_TAG
+        
+        # 2. Push the newly tagged image
+        docker push $DOCKER_IMAGE_TAG
       
-      - name: Deploy via SSH to Staging Server
-        uses: appleboy/ssh-action@v1.0.0
-        with:
+    - name: Deploy via SSH to Staging Server
+      uses: appleboy/ssh-action@v1.0.0
+      with:
           host: ${{ secrets.DEPLOYMENT_HOST_IP }}
           username: ${{ secrets.DEPLOYMENT_USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
