@@ -22,9 +22,9 @@ Key Objectives for this Phase:
 Technology Stack (TBD/Initial Selection) 
 | Component | Proposed Technology | Rationale |
 | --- | --- | --- | 
-| Mobile App (Frontend) | React Native / Flutter (TBD) | Cross-platform development speed for pilot. |
+| Mobile App (Frontend) | React Native | Cross-platform development speed for pilot. |
 | API (Backend/Logic)| Node.js (Express) | High performance, non-blocking I/O for high transaction throughput.|
-| Database | PostgreSQL / Firestore | Scalable storage for pseudonymised transaction data. |
+| Database | PostgreSQL| Scalable storage for pseudonymised transaction data. |
 | Version Control |  Git / GitHub | Mandatory for continuous integration and collaboration. |
 
 ## Getting Started
