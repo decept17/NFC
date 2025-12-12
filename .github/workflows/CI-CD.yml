@@ -4,9 +4,11 @@ on:
   push:
     branches:
       - main
+      - working
   pull_request:
     branches:
       - main
+      - working
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
 
