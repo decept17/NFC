@@ -68,6 +68,17 @@ CREATE TABLE limits (
 );
 
 ----------------------------------------------------
+-- 4. MERCHANTS TABLE (Assignment of merchants)
+----------------------------------------------------
+-- Allowing for merchant names and id to change and assignment of categories
+CREATE TABLE merchants (
+    merchant_id UUID PRIMARY KEY,
+    name TEXT NOT NULL,
+    category TEXT NOT NULL, -- e.g, 'Canteen', 'Stationary', 'Vapes'
+    api_key TEXT -- For the POS terminal to authenticate
+);
+
+----------------------------------------------------
 -- 4. TRANSACTIONS TABLE (Audit and History)
 ----------------------------------------------------
 -- Records all movement of funds. Essential for auditing and parent monitoring.
