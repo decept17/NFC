@@ -1,5 +1,5 @@
 # NFC-App
-## The Ecosystem of Accountability: NFC Wearable Payment System
+## A Financial Ecosystem: NFC Wearable Payment System
 
 This repository contains the source code, documentation, and infrastructure scripts for the NFC-Enabled Payment System, developed as part of my final project.
 
