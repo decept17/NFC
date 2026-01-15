@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from db.database import get_db
 from services.services import PaymentService
 from db.models import Account, Merchant
+from uuid import UUID
 
 app = FastAPI(title="NFC API Backend")
 
@@ -12,14 +13,14 @@ def read_root():
 
 # ------ Account Routes ------
 @app.get("/api/accounts/{account_id}/balance")
-def get_balance(account_id: str, db: Session = Depends(get_db)):
+def get_balance(account_id: UUID, db: Session = Depends(get_db)):
     account = db.query(Account).filter(Account.account_id == account_id).first()
     if not account:
         raise HTTPException(status_code=404, detail = "Account not found")
     return {"balance": float(account.balance)}
 
 @app.post("/api/accounts/{account_id}/topup")
-def top_up(account_id: str, amount: float = Body(..., embed=True), paymentMethodId: str =Body(..., embed=True) , db:Session = Depends(get_db)):
+def top_up(account_id: UUID, amount: float = Body(..., embed=True), paymentMethodId: str =Body(..., embed=True) , db:Session = Depends(get_db)):
     if amount <= 0:
         raise HTTPException(status_code=400, detail="Invalid amount")
     
@@ -38,7 +39,7 @@ def top_up(account_id: str, amount: float = Body(..., embed=True), paymentMethod
 def process_payment(
     nfcTokenId: str = Body(...),
     amount: float = Body(...),
-    merchantId: str = Body(...),
+    merchantId: UUID = Body(...),
     category: str = Body(...),
     db: Session = Depends(get_db)
 ):

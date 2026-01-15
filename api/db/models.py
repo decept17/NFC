@@ -21,6 +21,9 @@ class Transaction(Base):
     status = Column(String(20)) # Success, Failed
     merchant_id = Column(String(100))
     merchant_name = Column(String(255))
+
+    stripe_charge_id = Column(String(255), nullable=True)
+    stripe_transfer_id = Column(String(255), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 class Limit(Base):

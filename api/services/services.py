@@ -40,7 +40,7 @@ class PaymentService:
             )
             db.add(tx)
             db.commit()
-            return {"new_balance": account.balance}
+            return {"success": True, "new_balance": account.balance}
 
         except Exception as e:
             db.rollback()
@@ -92,8 +92,8 @@ class PaymentService:
                     amount=amount,
                     type="Payment",
                     status="Failed",
-                    merchant_id=merchant_id,
-                    merchant_name=failure_reason
+                    merchant_id=str(merchant_id),
+                    merchant_name=failure_reason if failure_reason else None
                 )
                 db.add(failure_tx)
                 db.commit()
@@ -119,7 +119,7 @@ class PaymentService:
                 amount=amount,
                 type="Payment",
                 status="Success",
-                merchant_id=merchant_id,
+                merchant_id=str(merchant_id),
                 stripe_transfer_id=transfer.id # Save proof of payment
             )
             db.add(success_tx)
