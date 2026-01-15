@@ -52,8 +52,6 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          # Install testing tools (not in requirements.txt yet)
-          pip install pytest httpx
 
       # 3. RUN TESTS
       - name: Run Unit & Integration Tests
@@ -69,7 +67,7 @@ jobs:
           #PAYMENT_GATEWAY_SECRET_KEY: ${{ secrets.PAYMENT_GATEWAY_SECRET_KEY }} # Optional for now if mocking Stripe
         run: |
           # This assumes you will create a 'tests/' folder
-          pytest
+          python -m pytest
           
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -94,8 +92,11 @@ jobs:
   deploy:
     # This deployment step only runs if the 'build-and-test' job succeeded 
     # and the trigger was a direct push to the 'main' branch (not a PR).
+    # Example: Allow deployment from main OR dev
     needs: build-and-test
-    if: github.ref == 'refs/heads/main'
+
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/working'
+    
     runs-on: ubuntu-latest
     
     steps:
