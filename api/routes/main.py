@@ -2,7 +2,7 @@ from fastapi import FastAPI, Depends, HTTPException, Body
 from sqlalchemy.orm import Session
 from db.database import get_db
 from services.services import PaymentService
-from db.models import Account
+from db.models import Account, Merchant
 
 app = FastAPI(title="NFC API Backend")
 
@@ -19,13 +19,18 @@ def get_balance(account_id: str, db: Session = Depends(get_db)):
     return {"balance": float(account.balance)}
 
 @app.post("/api/accounts/{account_id}/topup")
-def top_up(account_id: str, amount: float = Body(..., embed=True), db:Session = Depends(get_db)):
+def top_up(account_id: str, amount: float = Body(..., embed=True), paymentMethodId: str =Body(..., embed=True) , db:Session = Depends(get_db)):
     if amount <= 0:
         raise HTTPException(status_code=400, detail="Invalid amount")
     
-    result = PaymentService.top_up(db, account_id, amount)
+    result = PaymentService.top_up(db, account_id, amount, paymentMethodId)
+
     if not result:
         raise HTTPException(status_code=404, detail="Account not found")
+    
+    if "success" in result and result["success"] is False:
+        raise HTTPException(status_code=400, detail=result["message"])
+    
     return result
 
 # ----- Transaction Routes -----
@@ -37,7 +42,25 @@ def process_payment(
     category: str = Body(...),
     db: Session = Depends(get_db)
 ):
-    result = PaymentService.process_nfc_transaction(db, nfcTokenId, amount, merchantId, category)
+    # Validate merchant and get their stripe connect ID
+    # Dont trust client to send the stripe ID, look it up
+    merchant = db.query(Merchant).filter(Merchant.merchant_id == merchantId).first()
+
+    if not merchant:
+        raise HTTPException(status_code=404, detail="Merchant not found")
+    
+    if not merchant.stripe_account_id:
+        raise HTTPException(status_code=500, detail="Merchant has no linked Stripe account")
+    
+    result = PaymentService.process_nfc_transaction(
+        db,
+        nfcTokenId,
+        amount,
+        merchantId,
+        category,
+        merchant.stripe_account_id # passing the trusted ID from DB
+    )
+    
     if result["success"]:
         return {"status": "approved", "balance": result["new_balance"]}
     else:

@@ -133,6 +133,9 @@ class PaymentService:
     # ---------------------------------------------------------
     # PARENT WITHDRAWS (Money Out)
     # ---------------------------------------------------------
+
+    # FOR MVP - Logic only refunds the most recent top-up not the actual full amount in account
+    # When going in production this areas logic needs to change 
     @staticmethod
     def withdraw(db: Session, account_id: str, amount_to_withdraw: float):
         try:

@@ -2,7 +2,7 @@ from sqlalchemy import Column, String, Numeric, ForeignKey, DateTime, JSON, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.sql import func
 import uuid
-from database import Base
+from .database import Base
 
 class Account(Base):
     __tablename__ = "accounts"
@@ -29,3 +29,11 @@ class Limit(Base):
     daily_spending_limit = Column(Numeric(12,2), default=0.00)
     single_transaction_max = Column(Numeric(12,2), default=0.00)
     blocked_categories = Column(JSON) # List of strings
+
+class Merchant(Base):
+    __tablename__ = "merchants"
+    merchant_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    name = Column(String)
+    category = Column(String)
+    api_key = Column(String)
+    stripe_account_id = Column(String) # The destination for the funds

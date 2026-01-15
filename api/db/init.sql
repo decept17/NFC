@@ -75,7 +75,7 @@ CREATE TABLE merchants (
     merchant_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     name TEXT NOT NULL,
     category TEXT NOT NULL, -- e.g, 'Canteen', 'Stationary', 'Vapes'
-    api_key TEXT -- For the POS terminal to authenticate
+    api_key TEXT, -- For the POS terminal to authenticate
     -- CRITICAL: The School's unique Stripe Connect ID (starts with 'acct_...')
     stripe_account_id TEXT NOT NULL, 
     
@@ -101,7 +101,7 @@ CREATE TABLE transactions (
     merchant_name TEXT, 
 
     stripe_charge_id TEXT,   -- Stores the 'ch_...' from the Top-Up
-    stripe_transfer_id TEXT; -- Stores the 'tr_...' from the Meal Payment
+    stripe_transfer_id TEXT, -- Stores the 'tr_...' from the Meal Payment
     
     -- Metadata
     ip_address TEXT, -- For security/fraud logging
