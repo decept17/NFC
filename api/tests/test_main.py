@@ -8,7 +8,7 @@ from unittest.mock import MagicMock, patch
 # Assumes this file is in api/tests/ and you run pytest from api/
 from db.database import Base, get_db
 from db.models import Account, Merchant
-from routes.main import app
+from api.main import app
 
 # ---------------------------------------------------------
 # 1. SETUP TEST DATABASE

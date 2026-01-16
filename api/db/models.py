@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Numeric, ForeignKey, DateTime, JSON, Text
+from sqlalchemy import Column, String, Numeric, ForeignKey, DateTime, JSON, Text, Boolean
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.sql import func
 import uuid
@@ -40,3 +40,13 @@ class Merchant(Base):
     category = Column(String)
     api_key = Column(String)
     stripe_account_id = Column(String) # The destination for the funds
+
+class User(Base):
+    __tablename__ = "users"
+    user_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    role = Column(String, nullable=False) # Parent or Child
+    #Nullable because children dont have them
+    email = Column(String, unique=True, nullable=True)
+    password_hash = Column(String, nullable=True)
+    parent_id = Column(UUID(as_uuid=True), ForeignKey("users.user_id"), nullable=True) # parent doesnt need id
+    is_active = Column(Boolean, default=True)
