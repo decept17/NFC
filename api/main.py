@@ -8,7 +8,7 @@ from typing import List
 from pydantic import BaseModel
 from uuid import UUID
 from auth import create_access_token, verify_password, get_current_user
-import datetime
+from datetime import datetime
 
 app = FastAPI(title="NFC API Backend")
 
