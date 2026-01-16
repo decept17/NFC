@@ -11,6 +11,7 @@ class Account(Base):
     balance = Column(Numeric(12,2), default=0.00)
     status = Column(String(20), default="Active")
     nfc_token_id = Column(String(100), unique=True)
+    nfc_key = Column(String(100),unique=True, nullable=True)
 
 class Transaction(Base):
     __tablename__ = "transactions"
