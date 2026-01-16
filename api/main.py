@@ -3,15 +3,114 @@ from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from db.database import get_db
 from services.services import PaymentService
-from db.models import Account, Merchant, User
+from db.models import Account, Merchant, User, Transaction
+from typing import List
+from pydantic import BaseModel
 from uuid import UUID
 from auth import create_access_token, verify_password, get_current_user
+import datetime
 
 app = FastAPI(title="NFC API Backend")
 
 @app.get("/")
 def read_root():
     return {"message": "NFC Python API is running!"}
+
+# --- Pydantic Models (For request validation)
+class LinkNFCRequest(BaseModel):
+    nfc_uid: str # App must send a string here
+
+# ensures we only send safe data back to the app (filtering out internal IDs)
+class TransactionResponse(BaseModel):
+    amount: float
+    description: str
+    timestamp: datetime
+    category: str | None
+
+# ---- Account management routes -------
+@app.post("/api/accounts/{account_id}/link-nfc")
+def link_nfc_tag(
+    account_id: UUID, 
+    request: LinkNFCRequest,
+    # Security: We need to know WHO is asking (the parent)
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Links a physical NFC tag UID to a child's account.
+    """
+    # 1. Ownership Check (Parent Only)
+    account = db.query(Account).filter(Account.account_id == account_id).first()
+    if not account:
+        raise HTTPException(status_code=404, detail="Account not found")
+    
+    #Is the parent actually a parent to child who owns the account
+    child = db.query(User).filter(User.user_id == account.owner_id).first()
+    if not child or child.parent_id != current_user.user_id:
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+    # 2. Check if tag is already used by someone else
+    existing_tag = db.query(Account).filter(Account.nfc_token_id == request.nfc_uid).first()
+    if existing_tag:
+         raise HTTPException(status_code=400, detail="This NFC tag is already linked to another account")
+
+    # 3. Save the Link
+    account.nfc_token_id = request.nfc_uid
+    db.commit()
+    
+    return {"success": True, "message": "Wristband linked successfully"}
+
+@app.post("/api/accounts/{account_id}/freeze")
+def freeze_account(
+    account_id: UUID, 
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Emergency Stop: Locks the account so the NFC tag stops working.
+    """
+    account = db.query(Account).filter(Account.account_id == account_id).first()
+    if not account:
+        raise HTTPException(status_code=404, detail="Account not found")
+
+    # Verify Parent
+    child = db.query(User).filter(User.user_id == account.owner_id).first()
+    if child.parent_id != current_user.user_id:
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+    # Toggle Status if active go to frozen otherwise vice versa
+    new_status = "Active" if account.status == "Frozen" else "Frozen"
+    account.status = new_status
+    db.commit()
+    
+    return {"status": new_status}
+
+@app.get("/api/accounts/{account_id}/history", response_model=List[TransactionResponse])
+def get_history(
+    account_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Returns list of recent transactions.
+    """
+    # Ownership checks
+    account = db.query(Account).filter(Account.account_id == account_id).first()
+    if not account:
+        raise HTTPException(status_code=404, detail="Account not found")
+
+    # Verify Parent
+    child = db.query(User).filter(User.user_id == account.owner_id).first()
+    if child.parent_id != current_user.user_id:
+        raise HTTPException(status_code=403, detail="Not authorized")
+    
+    transactions = db.query(Transaction)\
+        .filter(Transaction.account_id == account_id)\
+        .order_by(Transaction.timestamp.desc())\
+        .limit(20)\
+        .all()
+        
+    return transactions
 
 # ------- Authentication routes -------
 @app.post("/api/auth/login")

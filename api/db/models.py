@@ -1,6 +1,7 @@
 from sqlalchemy import Column, String, Numeric, ForeignKey, DateTime, JSON, Text, Boolean
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.sql import func
+from sqlalchemy.orm import relationship
 import uuid
 from .database import Base
 
@@ -9,9 +10,12 @@ class Account(Base):
     account_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     owner_id = Column(UUID(as_uuid=True))
     balance = Column(Numeric(12,2), default=0.00)
-    status = Column(String(20), default="Active")
+    status = Column(String(20), default="Active") # Active, Frozen, Suspended
     nfc_token_id = Column(String(100), unique=True)
-    nfc_key = Column(String(100),unique=True, nullable=True)
+    #nfc_key = Column(String(100),unique=True, nullable=True) --- Later use
+
+    # relationship to transaction - allows sql to see transaction history
+    transactions = relationship("Transaction", back_populates="account")
 
 class Transaction(Base):
     __tablename__ = "transactions"
@@ -26,6 +30,8 @@ class Transaction(Base):
     stripe_charge_id = Column(String(255), nullable=True)
     stripe_transfer_id = Column(String(255), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    account = relationship("Account", back_populates="transactions")
 
 class Limit(Base):
     __tablename__ = "limits"

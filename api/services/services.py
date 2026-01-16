@@ -39,6 +39,15 @@ class PaymentService:
                 stripe_charge_id=intent.id 
             )
             db.add(tx)
+
+            # RECORD HISTORY
+            top_up_txn = Transaction(
+                account_id=account.account_id,
+                amount=amount, # Positive for deposit
+                description="Parent Top Up",
+                category="Transfer")
+            db.add(top_up_txn)
+
             db.commit()
             return {"success": True, "new_balance": account.balance}
 
@@ -123,6 +132,16 @@ class PaymentService:
                 stripe_transfer_id=transfer.id # Save proof of payment
             )
             db.add(success_tx)
+
+            new_txn = Transaction(
+                account_id=account.account_id,
+                merchant_id=merchant_id,
+                amount=-amount,  # Negative for spending
+                description=f"Purchase at {merchant_id}", # Or fetch merchant name
+                category=category)
+            
+            db.add(new_txn)
+
             db.commit()
             return {"success": True, "new_balance": float(account.balance)}
 
