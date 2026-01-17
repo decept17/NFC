@@ -16,7 +16,7 @@ app = FastAPI(title="NFC API Backend")
 def read_root():
     return {"message": "NFC Python API is running!"}
 
-# --- Pydantic Models (For request validation)
+# --- Pydantic Models For data request validation
 class LinkNFCRequest(BaseModel):
     nfc_uid: str # App must send a string here
 
