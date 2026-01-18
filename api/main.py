@@ -5,7 +5,7 @@ from db.database import get_db
 from services.services import PaymentService
 from db.models import Account, Merchant, User, Transaction
 from typing import List
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from uuid import UUID
 from auth import create_access_token, verify_password, get_current_user
 from datetime import datetime
@@ -18,14 +18,14 @@ def read_root():
 
 # --- Pydantic Models For data request validation
 class LinkNFCRequest(BaseModel):
-    nfc_uid: str # App must send a string here
+    nfc_uid: str = Field(...,description="nfc tags unique id") # App must send a string here
 
 # ensures we only send safe data back to the app (filtering out internal IDs)
 class TransactionResponse(BaseModel):
-    amount: float
-    description: str
-    timestamp: datetime
-    category: str | None
+    amount: float = Field(...,description="amount of money")
+    description: str = Field(...,description="what has been bought")
+    timestamp: datetime = Field(...,description="Time of transaction")
+    category: str | None = Field(...,description="What category of item is it in? if any")
 
 # ---- Account management routes -------
 @app.post("/api/accounts/{account_id}/link-nfc")
