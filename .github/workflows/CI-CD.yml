@@ -9,7 +9,11 @@ on:
     branches:
       - main
       - working
+<<<<<<< HEAD
   # Allows you to run this workflow manually from the Actions tab
+=======
+
+>>>>>>> working
   workflow_dispatch:
 
 jobs:
@@ -20,25 +24,54 @@ jobs:
       run:
         working-directory: ./api
         
+    services:
+      db:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: nfcuser
+          POSTGRES_PASSWORD: nfcpassword
+          POSTGRES_DB: nfc_db
+        ports:
+          - 5432:5432
+        # Health check to ensure DB is ready before tests run
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
+    # Setup Python
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
         with:
-          node-version: '20'
+          python-version: '3.11'
+          cache: 'pip' # dependencies to speed up future builds
 
+    # Install dependencies
       - name: Install dependencies
-        run: npm install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
 
-      # CRITICAL SECURITY STEP
-      - name: Run security audit
-        run: npm audit --audit-level=high 
-        
-      - name: Run unit tests (Placeholder)
-        # You will replace 'echo' with your actual test command (e.g., 'npm test')
-        run: echo "Running API unit tests..."
+      # 3. RUN TESTS
+      - name: Run Unit & Integration Tests
+        env:
+          # Inject test env vars to connect to the service container above
+          DB_HOST: localhost
+          DB_PORT: 5432
+          DB_USER: nfcuser
+          DB_PASSWORD: nfcpassword
+          DB_NAME: nfc_db
+          JWT_SECRET: test_secret
+          ENCRYPTION_KEY_AES: test_key
+          #PAYMENT_GATEWAY_SECRET_KEY: ${{ secrets.PAYMENT_GATEWAY_SECRET_KEY }} # Optional for now if mocking Stripe
+        run: |
+          # This assumes you will create a 'tests/' folder
+          python -m pytest
           
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -63,8 +96,11 @@ jobs:
   deploy:
     # This deployment step only runs if the 'build-and-test' job succeeded 
     # and the trigger was a direct push to the 'main' branch (not a PR).
+    # Example: Allow deployment from main OR dev
     needs: build-and-test
-    if: github.ref == 'refs/heads/main'
+
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/working'
+    
     runs-on: ubuntu-latest
     
     steps:
@@ -104,14 +140,17 @@ jobs:
             echo "Starting deployment on server..."
             # Log in to registry on server
             docker login -u ${{ secrets.DOCKER_USERNAME }} -p ${{ secrets.DOCKER_PASSWORD }}
+
             # Pull the latest image using the unique commit SHA tag
             docker pull ${{ secrets.DOCKER_USERNAME }}/nfc-api:${{ github.sha }}
+
             # Stop and remove the existing container
             docker stop nfc_api_staging || true && docker rm nfc_api_staging || true
+
             # Run the new container (using the same environment secrets as your local setup)
             docker run -d \
               --name nfc_api_staging \
-              -p 3000:8080 \
+              -p 8000:8000 \
               --env-file /path/to/server/.env \
               ${{ secrets.DOCKER_USERNAME }}/nfc-api:${{ github.sha }}
             echo "Deployment complete."
