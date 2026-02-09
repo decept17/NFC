@@ -3,7 +3,7 @@ import stripe
 from sqlalchemy.orm import Session
 from sqlalchemy import select, func
 from datetime import date
-from db.models import Account, Transaction, Limit
+from db.models import Account, Transaction, Limit, NFCTag, TagStatus, AccountType
 
 stripe.api_key = os.getenv("PAYMENT_GATEWAY_SECRET_KEY")
 
@@ -61,21 +61,38 @@ class PaymentService:
     @staticmethod
     def process_nfc_transaction(db: Session, nfc_token_id: str, amount: float, merchant_id: str, category: str, school_stripe_id: str):
         try:
-            # LOCK THE ROW (Prevent double-spending)
-            stmt = select(Account).where(Account.nfc_token_id == nfc_token_id).with_for_update()
+
+            # Find the physical tag first 
+            tag = db.query(NFCTag).filter(NFCTag.nfc_uid == nfc_token_id).first()
+
+            if not tag:
+                return {"success": False, "message": "NFC Token not recognized"}
+            
+            # check the wristband status 
+            if tag.status == TagStatus.FROZEN:
+                return {"success": False, "message": "Transaction declined: Wristband is Frozen"}
+            if tag.status == TagStatus.LOST:
+                return {"success": False, "message": "Transaction declined: Wristband reported Lost"}
+            
+            # Get the account, traversing from Tag -> User -> Account
+            # Lock the account row to prevent double spending 
+            user = tag.user
+            stmt = select(Account).filter(
+                Account.user_id == user.id,
+                Account.account_type == AccountType.WALLET
+                ).with_for_update()
+            
             account = db.execute(stmt).scalar_one_or_none()
 
             if not account:
-                return {"success": False, "message": "NFC Token not recognized"}
+                return {"success": False, "message": "No active wallet found for this user"}
 
             # FETCH LIMITS
             limits = db.query(Limit).filter(Limit.child_account_id == account.account_id).first()
             failure_reason = None
 
             # RUN LOGIC CHECKS (Status, Balance, Limits)
-            if account.status != "Active":
-                failure_reason = f"Account is {account.status}"
-            elif float(account.balance) < amount:
+            if account.balance < amount:
                 failure_reason = "Insufficient funds"
             elif limits:
                 if limits.single_transaction_max > 0 and amount > float(limits.single_transaction_max):
