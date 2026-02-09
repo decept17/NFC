@@ -5,27 +5,41 @@ This repository contains the source code, documentation, and infrastructure scri
 
 The system's core function is to provide a secure, controlled, and wearable payment solution, primarily targeted at schools and family financial management.
 
+For further detail on the project:
+[Specification](docs/SPECIFICATION.md) and [Requirements](docs/REQUIREMENTS.md)
+
 ## Project Status (Sprint 1: Infrastructure & Core Security)
 
 Target Completion: [Date 4 weeks from now]
 
 Key Objectives for this Phase:
 
-1. Version Control & Repository Setup: Completed.
+1. Version Control & Repository Setup: **Completed.**
 
-2. Payment Gateway Integration: Selection and sandbox key acquisition in progress.
+2. Payment Gateway Integration: Selection and sandbox key acquisition in progress. 
 
-3. Initial Data Model Definition: Core Parent-Child schema designed.
+3. Initial Data Model Definition: Core Parent-Child schema designed. **Completed**
 
-4. Authentication Scaffolding: Initial secure login/registration implemented.
+4. Authentication Scaffolding: Initial secure login/registration implemented. **Completed**
 
 Technology Stack (TBD/Initial Selection) 
 | Component | Proposed Technology | Rationale |
 | --- | --- | --- | 
-| Mobile App (Frontend) | React Native / Flutter (TBD) | Cross-platform development speed for pilot. |
-| API (Backend/Logic)| Node.js (Express) | High performance, non-blocking I/O for high transaction throughput.|
-| Database | PostgreSQL / Firestore | Scalable storage for pseudonymised transaction data. |
-| Version Control |  Git / GitHub | Mandatory for continuous integration and collaboration. |
+| Mobile App (Frontend) | React Native | Cross-platform development speed for pilot. |
+| API (Backend/Logic)| Python FastAPI | High performance, non-blocking I/O for high transaction throughput.|
+| Database | PostgreSQL  | Scalable storage for pseudonymised transaction data. |
+| Version Control |  GitHub | Mandatory for continuous integration and collaboration. |
+
+## Sprint 2: Front-End 
+
+Target Completion: [10th of March]
+Key Objectives:
+
+1. Create Minimum amount of pages for use
+
+2. Connect End-points for use with backend 
+   
+3. Intergrate with NFC chip
 
 ## Getting Started
 
@@ -48,5 +62,6 @@ To clone this repository and begin development:
 > Navigate to the api/ and mobile-app/ folders and run the appropriate installation commands (e.g., npm install or pip install -r requirements.txt).
 
 ## Project structure 
-
+This is a high level summary of the project structure and below it is the inital design of the N3XO application UI.
 ![Layout & Purpose](image.png)
+![N3xo](N3XO-Design.jpg)
