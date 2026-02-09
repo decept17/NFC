@@ -25,13 +25,88 @@
 * **Security:** Passwords must be salted and hashed (Bcrypt).
 * **Latency:** Transaction processing < 500ms.
 * **Availability:** System must auto-restart on crash (handled by Docker `restart: always`).
+* * **Authentication:** Multi-factor authentication and biometric login.
+* * **Secure Payments:** Only 1 payment should be processed at a time per band
+* * **Accuracy:** Absolute consistency in transaction processing and data integrity 
+* * **Compliance:** Adheres to all compliance laws and off-shores to third party 
 
 ## 3. Test Plan
-### Manual Tests
-1.  **Provisioning:** Manually insert a user into DB with balance $100.
-2.  **Spending:** Call API with Postman to spend $50. Check DB balance is $50.
-3.  **Overdraft:** Call API to spend $60. Expect HTTP 400 Error.
+This plan covers Unit, Intergration and System testing.
 
-### Automated Tests (Future Scope)
-* Jest unit tests for `TransactionService`.
-* Supertest for Express Routes.
+### Phase 1: Backend Unit Testing (Logic Verification)
+Tools: pytest, unittest.mock
+
+**A. Authentication & RBAC**
+| Test Case | Description | Expected Result |
+| :--- | :--- | :--- |
+| Login Success | Valid email/password combination. | Return 200 OK + JWT Token. |
+| Login Failure | Invalid password or non-existent email. | Return 401 Unauthorized. |
+| Token Expiry | Use a manipulated token with an old exp date. | Return 401 Unauthorized. |
+| Data Isolation | Parent A attempts to view Parent B's family accounts. | Return 403 or empty list. |
+
+**B. Account Management**
+| Test Case | Description | Expected Result |
+| :--- | :--- | :--- |
+| Link NFC Tag | Parent links a new unique NFC UID to a child. | Success, DB updates nfc_token_id. |
+| Duplicate NFC | Attempt to link an NFC UID already assigned to another user. | Return 400 Bad Request. |
+| Freeze Account | Parent toggles status on a child's account. | Status changes Active ↔ Frozen. |
+
+### Phase 2: Integration Testing (Database & Concurrency)
+Tools: pytest, Docker Test Database
+
+**A. Concurrency (Double-Spend Prevention)**
+Critical for financial apps.
+
+Simultaneous Taps: Simulate two POS terminals sending a payment request for the same NFC tag at the exact same millisecond.
+
+Test: Spawn 2 threads calling process_nfc_transaction for £10 on an account with only £15 balance.
+
+Goal: Ensure with_for_update() locks the row correctly. Only one transaction should succeed; the other must fail with "Insufficient funds".
+
+**B. Data Integrity**
+
+Foreign Key Constraints: Attempt to create a transaction for a non-existent account_id. Database should raise an integrity error.
+
+Orphaned Records: Delete a User and ensure CASCADE delete removes their auth data but restricts deletion if financial transactions exist (as per schema definition).
+
+### Phase 3: Stripe Payment Integration Testing
+Tools: Stripe Sandbox Mode, Postman
+
+*As this feature is In Progress these tests verify the interaction between your API and Stripe's servers.*
+
+A. Top-Up Flow (Money In)
+| Component | Test Action | Verification |
+| :--- | :--- | :--- |
+| Stripe Intent | Call /topup with valid test card (e.g., Stripe 4242). | Verify stripe.PaymentIntent.create succeeds. Verify stripe_charge_id is saved in DB. |
+| Card Declined | Call /topup with Stripe generic decline card. | API catches exception, rolls back DB transaction (Balance does not change). |
+
+B. NFC Transaction Flow (Money Movement)
+| Component | Test Action | Verification |
+| :--- | :--- | :--- |
+| Merchant Link | Ensure the Merchant in DB has a valid stripe_account_id (Connect ID). | System identifies destination account. |
+| Transfer | Process a valid NFC payment. | Verify stripe.Transfer.create moves funds from Platform -> Merchant Connect Account. |
+| Transfer Fail | Simulate Stripe API downtime/error during transfer. | DB transaction rolls back; User balance is not deducted. |
+
+C. Withdrawal Flow (Money Out)
+| Component | Test Action | Verification |
+| :--- | :--- | :--- |
+| Refund | Parent withdraws unused funds. | System locates the original stripe_charge_id from the Top-Up history and issues a Partial Refund. |
+
+### Phase 4: Mobile App (Frontend) Testing
+Tools: Jest, React Native Testing Library
+
+Navigation Smoke Test: Verify app launches and navigates from Login -> Dashboard.
+
+Input Validation: Ensure the Top-Up input field rejects non-numeric characters.
+
+State Sync:
+
+Perform a Top-Up on the backend/API.
+
+Refresh the Mobile App Dashboard.
+
+Verify the displayed balance updates to match the server.
+
+NFC Interaction (Mocked):
+
+Since physical NFC scanning is hard to automate, should create a button that injects a specific nfc_token_id to the API to simulate a physical tap.
