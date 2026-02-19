@@ -33,16 +33,16 @@ const styles = StyleSheet.create({
     paddingVertical: 50,
   },
   logoContainer: {
-    flex: 1,
+    marginTop: 40,
     justifyContent: 'center',
     alignItems: 'center',
   },
   logoText: {
-    fontSize: 60,
+    fontSize: 90,
     color: Colors.textOrange,
     textShadowColor: 'rgba(0, 0, 0, 0.2)',
-    textShadowOffset: { width: 2, height: 2 },
-    textShadowRadius: 5,
+    textShadowOffset: { width: 5, height: 5 },
+    textShadowRadius: 10,
   },
   buttonContainer: {
     alignItems: 'center',

@@ -1,10 +1,10 @@
 // mobile-app/constants/Colors.ts
 
 export const Colors = {
-  backgroundBlue: '#87CEEB', // Sky blue for Welcome/Register
+  backgroundBlue: '#0195cfd4', // Sky blue for Welcome/Register
   backgroundPeach: '#FA8072', // Salmon/Peach for Login
   buttonDark: '#222222',      // Dark pill buttons
-  textOrange: '#FF7F50',      // The N3XO logo color
+  textOrange: '#ffffff',      // The N3XO logo color
   textWhite: '#FFFFFF',
   inputBackground: '#333333', // Dark background for inputs
   header: {
