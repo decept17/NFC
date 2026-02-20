@@ -37,7 +37,7 @@ export const PillInput = ({
 const styles = StyleSheet.create({
   inputContainer: {
     width: '80%',
-    marginVertical: 10,
+    marginVertical: 15,
   },
   input: {
     backgroundColor: Colors.inputBackground,
@@ -45,6 +45,6 @@ const styles = StyleSheet.create({
     borderRadius: 30,
     paddingVertical: 15,
     paddingHorizontal: 20,
-    fontSize: 16,
+    fontSize: 14,
   },
 });

@@ -1,5 +1,5 @@
 import React from 'react';
-import { TouchableOpacity, Text, TextInput, StyleSheet, View, StyleProp, ViewStyle, ActivityIndicator } from 'react-native';
+import { TouchableOpacity, Text, StyleSheet, StyleProp, ViewStyle, ActivityIndicator } from 'react-native';
 import { Colors } from '@/constants/Colours';
 
 interface PillButtonProps {
@@ -33,9 +33,9 @@ const styles = StyleSheet.create({
     paddingVertical: 15,
     paddingHorizontal: 40,
     borderRadius: 30,
-    width: '80%',
+    width: '75%',
     alignItems: 'center',
-    marginVertical: 10,
+    marginVertical: 15,
     // Add subtle shadow for depth
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
