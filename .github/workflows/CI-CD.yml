@@ -95,7 +95,8 @@ jobs:
     # Example: Allow deployment from main OR dev
     needs: build-and-test
 
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/working'
+    if: github.ref == 'refs/heads/main' 
+    # || github.ref == 'refs/heads/working'
     
     runs-on: ubuntu-latest
     
