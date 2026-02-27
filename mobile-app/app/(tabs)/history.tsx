@@ -85,12 +85,6 @@ export default function HistoryScreen() {
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
         stickySectionHeadersEnabled={false}
-        // "View All" button at the bottom
-        // ListFooterComponent={() => (
-        //   <TouchableOpacity style={styles.viewAllButton}>
-        //     <Text style={styles.viewAllText}>View Entire History</Text>
-        //   </TouchableOpacity>
-        // )}
       />
         <View style={styles.bottomButtonContainer}>
           <TouchableOpacity style={styles.viewAllButton}>
@@ -105,7 +99,7 @@ export default function HistoryScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: Colors.backgroundPeach, // Using the salmon/peach color from your mockup
+    backgroundColor: Colors.backgroundPeach, 
   },
   header: {
     flexDirection: 'row',
@@ -137,7 +131,6 @@ const styles = StyleSheet.create({
     marginTop: 20,
     marginBottom: 15,
   },
-  
   // Transaction Row Styles
   transactionRow: {
     flexDirection: 'row',

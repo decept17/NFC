@@ -1,10 +1,13 @@
 import { Stack } from "expo-router";
 import { Colors } from "@/constants/Colours";
 import { StatusBar } from "expo-status-bar";
+import { StripeProvider } from "@stripe/stripe-react-native"
 
 export default function RootLayout() {
   return (
-    <>
+    < StripeProvider
+      publishableKey="pk_test_YOUR_SANDBOX_PUBLIC" // to be replaced with actual stripe publishable key later 
+    >
       <StatusBar style="light" />
       <Stack 
         screenOptions={{
@@ -27,6 +30,6 @@ export default function RootLayout() {
         <Stack.Screen name="register" />
         <Stack.Screen name="(tabs)" options={{headerShown: false}} />
       </Stack>
-    </>
+      </StripeProvider>
   );
 }
