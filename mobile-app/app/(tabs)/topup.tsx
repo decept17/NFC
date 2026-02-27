@@ -4,8 +4,9 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useStripe, CardField } from '@stripe/stripe-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFamily } from '@/context/FamilyContext';
 
-// Reuse your existing UI components
+// Reusing existing UI components
 import { Colors } from '@/constants/Colours';
 import { PillButton } from '@/components/PillButton';
 import { PillInput } from '@/components/PillInput';
@@ -14,14 +15,15 @@ import { TouchableOpacity } from 'react-native';
 export default function TopUpScreen() {
   const router = useRouter();
   const { createPaymentMethod } = useStripe();
+  const { selectedAccount } = useFamily();
   
   const [amount, setAmount] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(false);
   const [isCardComplete, setIsCardComplete] = useState<boolean>(false);
 
   const handleTopUp = async () => {
-    // 1. Basic Validation
     const numericAmount = parseFloat(amount);
+    
     if (!amount || isNaN(numericAmount) || numericAmount <= 0) {
       Alert.alert("Invalid Amount", "Please enter a valid amount to top up.");
       return;
@@ -35,7 +37,6 @@ export default function TopUpScreen() {
     setLoading(true);
 
     try {
-      // 2. Ask Stripe to tokenize the card details securely
       const { paymentMethod, error } = await createPaymentMethod({
         paymentMethodType: 'Card',
       });
@@ -46,23 +47,15 @@ export default function TopUpScreen() {
         return;
       }
 
-      // 3. Send the tokenized ID and amount to your Python Backend
       console.log("Success! Sending to backend:", {
+        accountId: selectedAccount?.id,
         amount: numericAmount,
         paymentMethodId: paymentMethod.id
       });
 
-      /* TODO: Wire this up to your API later!
-        const response = await axios.post(`/api/accounts/${accountId}/topup`, {
-          amount: numericAmount,
-          paymentMethodId: paymentMethod.id
-        });
-      */
-
-      // Simulate network delay for now
       setTimeout(() => {
         setLoading(false);
-        Alert.alert("Success!", `£${numericAmount.toFixed(2)} has been added to the account.`);
+        Alert.alert("Success!", `£${numericAmount.toFixed(2)} has been added to ${selectedAccount?.name}'s account.`);
         router.push('/(tabs)/home');
       }, 1500);
 
@@ -80,18 +73,16 @@ export default function TopUpScreen() {
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'} 
           style={styles.container}
         >
-          {/* HEADER */}
           <View style={styles.header}>
             <TouchableOpacity onPress={() => router.push('/(tabs)/home')}>
-              <Ionicons name="arrow-back" size={32} color={Colors.buttonDark} />
+              <Ionicons name="person-outline" size={32} color={Colors.buttonDark} />
             </TouchableOpacity>
-            <Text style={styles.headerTitle}>Top Up</Text>
-            <View style={{ width: 32 }} /> {/* Spacer for centering */}
+            {/* DYNAMIC TITLE */}
+            <Text style={styles.headerTitle}>Top Up {selectedAccount?.name}</Text>
+            <View style={{ width: 32 }} /> 
           </View>
 
           <View style={styles.content}>
-            
-            {/* AMOUNT INPUT */}
             <Text style={styles.label}>Enter Amount (£)</Text>
             <PillInput 
               placeholder="0.00" 
@@ -100,11 +91,10 @@ export default function TopUpScreen() {
               keyboardType="decimal-pad" 
             />
 
-            {/* STRIPE CARD FIELD */}
             <Text style={styles.label}>Payment Details</Text>
             <View style={styles.cardContainer}>
               <CardField
-                postalCodeEnabled={false} // Disable if you don't require billing zip code
+                postalCodeEnabled={false} 
                 onCardChange={(cardDetails) => {
                   setIsCardComplete(cardDetails.complete);
                 }}
@@ -117,7 +107,6 @@ export default function TopUpScreen() {
               />
             </View>
 
-            {/* SUBMIT BUTTON */}
             <View style={styles.buttonWrapper}>
               <PillButton 
                 title={`Pay £${amount ? amount : '0.00'}`} 
@@ -125,7 +114,6 @@ export default function TopUpScreen() {
                 isLoading={loading}
               />
             </View>
-
           </View>
         </KeyboardAvoidingView>
       </SafeAreaView>

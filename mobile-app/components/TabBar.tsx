@@ -1,22 +1,12 @@
 import React, { JSX } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
-import { Ionicons } from '@expo/vector-icons';
-import { Colors } from '@/constants/Colours';
 import { TabBarButton } from './TabBarButton';
 
 export const TabBar = ({ state, descriptors, navigation }: BottomTabBarProps) => {
   // Use your app's theme colors
   const primaryColor = 'grey'; // active colour
   const greyColor = '#00b7cf'; // inactive colour
-
-  // Map your route names to specific Ionicons
-  const icons: Record<string, (props: any) => JSX.Element> = {
-    home: (props: any) => <Ionicons name="home" size={24} {...props} />,
-    topup: (props: any) => <Ionicons name="add-circle" size={24} {...props} />,
-    link: (props: any) => <Ionicons name="hardware-chip-outline" size={24} {...props} />,
-    history: (props: any) => <Ionicons name="time" size={24} {...props} />,
-  };
 
     return (
     <View style={styles.tabbar}>
@@ -29,7 +19,7 @@ export const TabBar = ({ state, descriptors, navigation }: BottomTabBarProps) =>
             ? options.title
             : route.name;
 
-        if (['_sitemap', '+not-found'].includes(route.name)) return null;
+        if (['_sitemap', '+not-found','settings'].includes(route.name)) return null;
 
         const isFocused = state.index === index;
 

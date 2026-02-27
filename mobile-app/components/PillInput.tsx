@@ -3,7 +3,7 @@ import React from 'react';
 import { TextInput, View, StyleSheet, KeyboardTypeOptions } from 'react-native';
 import { Colors } from '@/constants/Colours';
 
-interface PillInputProps {
+type PillInputProps = {
   placeholder: string;
   value: string;
   onChangeText: (text: string) => void;

@@ -1,8 +1,7 @@
 import React from 'react';
 import { TouchableOpacity, Text, StyleSheet, StyleProp, ViewStyle, ActivityIndicator } from 'react-native';
 import { Colors } from '@/constants/Colours';
-
-interface PillButtonProps {
+type PillButtonProps = {
     title: string;
     style?: StyleProp<ViewStyle>;
     onPress?: () => void;

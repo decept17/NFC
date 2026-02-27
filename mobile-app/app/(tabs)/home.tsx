@@ -4,53 +4,52 @@ import { View, Text, StyleSheet, Dimensions, FlatList, TouchableOpacity, } from 
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '@/constants/Colours';
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useFamily, Account } from '@/context/FamilyContext';
+import { router } from 'expo-router';
 
 const { width } = Dimensions.get('window');
 
-// --- 1. MOCK DATA (Matches your API structure) ---
-const INITIAL_ACCOUNTS = [
-  { id: '1', name: 'Sarah', role: 'Child', balance: 20.00, status: 'Active' },
-  { id: '2', name: 'James', role: 'Child', balance: 5.50, status: 'Frozen' },
-];
-
 export default function HomeScreen() {
-  const [accounts, setAccounts] = useState(INITIAL_ACCOUNTS);
-  const [currentIndex, setCurrentIndex] = useState(0);
+  // 1. Hook into the Global Context instead of local state!
+  const { accounts, setAccounts, selectedAccountId, setSelectedAccountId, selectedAccount } = useFamily();
 
-  // Get the current child being viewed
-  const currentAccount = accounts[currentIndex];
+  // Find the index of the selected account for the carousel
+  const currentIndex = accounts.findIndex(acc => acc.id === selectedAccountId);
   
-  // Determine screen colors based on status
-  const isFrozen = currentAccount.status === 'Frozen';
+  // Safe fallback just in case
+  if (!selectedAccount) return null; 
+
+  const isFrozen = selectedAccount.status === 'Frozen';
   const backgroundColor = isFrozen ? Colors.backgroundPeach : Colors.backgroundBlue;
-  
-  // Toggle Button styles (Opposite of background for contrast)
   const toggleBtnColor = isFrozen ? Colors.backgroundBlue : Colors.backgroundPeach;
   const toggleBtnText = isFrozen ? "Activate" : "Freeze";
 
-  // --- 2. HANDLERS ---
-  
-  // Updates the index when the user swipes to a new card
+  // 2. Update Global Context when swiping
   const handleScroll = (event: any) => {
     const slideSize = event.nativeEvent.layoutMeasurement.width;
     const index = event.nativeEvent.contentOffset.x / slideSize;
     const roundIndex = Math.round(index);
-    if (roundIndex !== currentIndex) {
-      setCurrentIndex(roundIndex);
+    
+    if (roundIndex !== currentIndex && accounts[roundIndex]) {
+      // The user swiped! Tell the whole app that a new child is selected.
+      setSelectedAccountId(accounts[roundIndex].id);
     }
   };
 
-  // Toggles the freeze/active state of the current account
+  // 3. Toggle Status (updates global state so it persists if you leave the tab and come back)
   const handleToggleStatus = () => {
-    const updatedAccounts = [...accounts];
-    updatedAccounts[currentIndex].status = isFrozen ? 'Active' : 'Frozen';
+    const updatedAccounts = accounts.map( acc => {
+      if (acc.id === selectedAccountId) {
+        return { ...acc, status: isFrozen ? 'Active' : 'Frozen' };
+      }
+      return acc;
+    });
     setAccounts(updatedAccounts);
-    // TODO: Later, we will send an API request here to update the DB
   };
 
   // --- 3. RENDER COMPONENTS ---
 
-  const renderChildCard = ({ item }: { item: typeof INITIAL_ACCOUNTS[0] }) => (
+  const renderChildCard = ({ item }: { item: Account }) => (
     <View style={styles.cardContainer}>
       <View style={styles.card}>
         <Text style={styles.cardSubtitle}>{item.name} · {item.role}</Text>
@@ -70,7 +69,7 @@ export default function HomeScreen() {
         
         <Text style={styles.headerLogo}>N3XO</Text>
         
-        <TouchableOpacity>
+        <TouchableOpacity onPress={() => router.push('/settings')}>
           <Ionicons name="ellipsis-vertical" size={28} color={Colors.buttonDark} />
         </TouchableOpacity>
       </View>

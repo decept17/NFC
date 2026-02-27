@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '@/constants/Colours';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFamily } from '@/context/FamilyContext';
 
 // --- 1. MOCK DATA (Mirrors your TransactionResponse from main.py) ---
 // We use dynamic dates so "Today" always works when you test it.
@@ -22,8 +23,15 @@ const MOCK_TRANSACTIONS = [
 export default function HistoryScreen() {
   const router = useRouter();
 
+  // get child
+  const {selectedAccount} = useFamily();
+
   // --- 2. HELPER FUNCTION: Group data by date ---
   const groupTransactions = (transactions: typeof MOCK_TRANSACTIONS) => {
+
+    // filter transactions for specific child
+    const childTransactions = transactions.filter(t => t.id === selectedAccount?.id);
+
     // In a real app, you'd use a date library like date-fns or moment.js
     // For now, we manually group them into "Today" and "Last Week"
     const todayItems = transactions.filter(t => new Date(t.timestamp).toDateString() === today.toDateString());
@@ -32,7 +40,7 @@ export default function HistoryScreen() {
     return [
       { title: 'Today', data: todayItems },
       { title: 'This Week', data: olderItems },
-    ];
+    ].filter(section => section.data.length > 0);
   };
 
   const sections = groupTransactions(MOCK_TRANSACTIONS);
@@ -66,12 +74,16 @@ export default function HistoryScreen() {
       {/* HEADER */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.push('/(tabs)/home')}>
-          <Ionicons name="arrow-back" size={32} color={Colors.buttonDark} />
+          <Ionicons name="person-outline" size={32} color={Colors.buttonDark} />
         </TouchableOpacity>
+
+        {/* 5. SHOW WHOSE HISTORY THIS IS */}
+        <View style={{ alignItems: 'center' }}>
+          <Text style={styles.headerLogo}>N3XO</Text>
+          <Text style={styles.subHeader}>{selectedAccount?.name}'s History</Text>
+        </View>
         
-        <Text style={styles.headerLogo}>N3XO</Text>
-        
-        <TouchableOpacity>
+        <TouchableOpacity onPress={() => router.push('/settings')}>
           <Ionicons name="ellipsis-vertical" size={28} color={Colors.buttonDark} />
         </TouchableOpacity>
       </View>
@@ -85,6 +97,7 @@ export default function HistoryScreen() {
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
         stickySectionHeadersEnabled={false}
+        ListEmptyComponent={<Text style={styles.emptyText}>No recent transactions.</Text>}
       />
         <View style={styles.bottomButtonContainer}>
           <TouchableOpacity style={styles.viewAllButton}>
@@ -181,5 +194,17 @@ const styles = StyleSheet.create({
     paddingTop: 10,
     paddingBottom: 120, // CRITICAL: This 110px padding pushes the button up so your custom floating tab bar doesn't cover it
     backgroundColor: Colors.backgroundPeach, // Solid background so scrolling list items hide cleanly behind it
+  },
+  subHeader: {
+    fontSize: 12,
+    color: '#838383',
+    fontWeight: '600',
+    marginTop: 2,
+  },
+  emptyText: {
+    textAlign: 'center',
+    marginTop: 40,
+    fontSize: 16,
+    color: '#555',
   },
 });

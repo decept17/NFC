@@ -2,7 +2,7 @@ import React from 'react';
 import { TouchableOpacity, Text, StyleSheet, View } from 'react-native';
 import { FontAwesome5 } from '@expo/vector-icons'; 
 
-interface SocialButtonProps {
+type SocialButtonProps = {
     title: string;
     iconName: string;
     onPress: () => void;
