@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, PressableProps } from 'react-native';
 import Animated, { interpolate, useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 
-// 1. Define the props we expect
+// Define the props 
 interface TabBarButtonProps extends PressableProps {
   isFocused: boolean;
   label: string;
@@ -11,7 +11,7 @@ interface TabBarButtonProps extends PressableProps {
   color: string;
 }
 
-// 2. Map routes to their respective icons
+// Map routes to their respective icons
 const icons: Record<string, (props: any) => JSX.Element> = {
   home: (props: any) => <Ionicons name="home" size={24} {...props} />,
   topup: (props: any) => <Ionicons name="add-circle" size={24} {...props} />,
