@@ -107,3 +107,15 @@ CREATE TABLE transactions (
     ip_address TEXT, -- For security/fraud logging
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+CREATE TYPE tag_status AS ENUM ('active', 'frozen', 'lost');
+
+CREATE TABLE nfc_tags (
+    id VARCHAR PRIMARY KEY,
+    nfc_uid VARCHAR UNIQUE NOT NULL,
+    user_id VARCHAR NOT NULL REFERENCES users(id),
+    status tag_status DEFAULT 'active',
+    label VARCHAR,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    last_used_at TIMESTAMP
+);

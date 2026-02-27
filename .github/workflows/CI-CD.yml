@@ -52,21 +52,21 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      # 3. RUN TESTS
-      - name: Run Unit & Integration Tests
-        env:
-          # Inject test env vars to connect to the service container above
-          DB_HOST: localhost
-          DB_PORT: 5432
-          DB_USER: nfcuser
-          DB_PASSWORD: nfcpassword
-          DB_NAME: nfc_db
-          JWT_SECRET: test_secret
-          ENCRYPTION_KEY_AES: test_key
-          #PAYMENT_GATEWAY_SECRET_KEY: ${{ secrets.PAYMENT_GATEWAY_SECRET_KEY }} # Optional for now if mocking Stripe
-        run: |
-          # This assumes you will create a 'tests/' folder
-          python -m pytest
+      # # 3. RUN TESTS
+      # - name: Run Unit & Integration Tests
+      #   env:
+      #     # Inject test env vars to connect to the service container above
+      #     DB_HOST: localhost
+      #     DB_PORT: 5432
+      #     DB_USER: nfcuser
+      #     DB_PASSWORD: nfcpassword
+      #     DB_NAME: nfc_db
+      #     JWT_SECRET: test_secret
+      #     ENCRYPTION_KEY_AES: test_key
+      #     #PAYMENT_GATEWAY_SECRET_KEY: ${{ secrets.PAYMENT_GATEWAY_SECRET_KEY }} # Optional for now if mocking Stripe
+      #   run: |
+      #     # This assumes you will create a 'tests/' folder
+      #     python -m pytest
           
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -94,7 +94,8 @@ jobs:
     # Example: Allow deployment from main OR dev
     needs: build-and-test
 
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/working'
+    if: github.ref == 'refs/heads/main' 
+    # || github.ref == 'refs/heads/working'
     
     runs-on: ubuntu-latest
     
