@@ -1,36 +1,37 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, Dimensions, FlatList, TouchableOpacity, Alert} from 'react-native';
+import { View, Text, StyleSheet, Dimensions, FlatList, TouchableOpacity, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Colors } from '@/constants/Colours';
 import { PillButton } from '@/components/PillButton';
 import { useFamily } from '@/context/FamilyContext';
+import { fetchApi } from '@/services/api';
 
 const { width } = Dimensions.get('window');
 
 export default function LinkScreen() {
   const router = useRouter();
-  
+
   // 2. GRAB THE SELECTED CHILD
   const { selectedAccount } = useFamily();
-  
+
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isConnecting, setIsConnecting] = useState(false);
 
   // 3. DYNAMIC INSTRUCTIONS
   const INSTRUCTIONS = [
-    { 
-      id: '1', 
-      text: `To link ${selectedAccount?.name}'s NFC band, follow this guide and once ready, select connect.` 
+    {
+      id: '1',
+      text: `To link ${selectedAccount?.name}'s NFC band, follow this guide and once ready, select connect.`
     },
-    { 
-      id: '2', 
-      text: 'Ensure your phone case is not too thick, as it may block the NFC signal.' 
+    {
+      id: '2',
+      text: 'Ensure your phone case is not too thick, as it may block the NFC signal.'
     },
-    { 
-      id: '3', 
-      text: 'Locate the NFC reader on your phone (usually near the top camera module).' 
+    {
+      id: '3',
+      text: 'Locate the NFC reader on your phone (usually near the top camera module).'
     },
   ];
 
@@ -47,20 +48,32 @@ export default function LinkScreen() {
 
   const handleStartConnection = () => {
     setIsConnecting(true);
-    
-    // Simulate NFC Read
-    setTimeout(() => {
-      setIsConnecting(false);
-      
-      // 4. THIS IS WHERE YOU WILL CALL YOUR API LATER:
-      // axios.post(`/api/accounts/${selectedAccount?.id}/link-nfc`, { nfc_uid: "SCANNED_TAG_123" })
-      
-      Alert.alert(
-        "Success!", 
-        `${selectedAccount?.name}'s NFC Band linked successfully.`,
-        [{ text: "OK", onPress: () => router.push('/(tabs)/home') }]
-      );
-    }, 3000);
+
+    // Simulate NFC Read with a delay, since real NFC integration is for Sprint 2 Phase 3
+    setTimeout(async () => {
+      try {
+        const fakeUid = "SCANNED_TAG_" + Math.random().toString().slice(2, 8);
+        const response = await fetchApi(`/accounts/${selectedAccount?.id}/link-nfc`, {
+          method: 'POST',
+          body: JSON.stringify({ nfc_uid: fakeUid })
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.detail || "Linking failed on backend.");
+        }
+
+        Alert.alert(
+          "Success!",
+          `${selectedAccount?.name}'s NFC Band linked successfully.`,
+          [{ text: "OK", onPress: () => router.push('/(tabs)/home') }]
+        );
+      } catch (error: any) {
+        Alert.alert("Error", error.message || "Something went wrong.");
+      } finally {
+        setIsConnecting(false);
+      }
+    }, 2000);
   };
 
   const renderInstructionCard = ({ item }: { item: typeof INSTRUCTIONS[0] }) => (
@@ -73,18 +86,18 @@ export default function LinkScreen() {
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor }]}>
-      
+
       <View style={styles.header}>
-            <TouchableOpacity>
-              <Ionicons name="person-outline" size={28} color={Colors.buttonDark} />
-            </TouchableOpacity>
-              
-            <Text style={styles.headerLogo}>N3XO</Text>
-              
-            <TouchableOpacity onPress={() => router.push('/settings')}>
-              <Ionicons name="ellipsis-vertical" size={28} color={Colors.buttonDark} />
-            </TouchableOpacity>
-        </View>
+        <TouchableOpacity>
+          <Ionicons name="person-outline" size={28} color={Colors.buttonDark} />
+        </TouchableOpacity>
+
+        <Text style={styles.headerLogo}>N3XO</Text>
+
+        <TouchableOpacity onPress={() => router.push('/settings')}>
+          <Ionicons name="ellipsis-vertical" size={28} color={Colors.buttonDark} />
+        </TouchableOpacity>
+      </View>
 
       {!isConnecting ? (
         <View style={styles.contentWrapper}>
@@ -99,15 +112,15 @@ export default function LinkScreen() {
               onMomentumScrollEnd={handleScroll}
               bounces={false}
             />
-            
+
             <View style={styles.pagination}>
               {INSTRUCTIONS.map((_, index) => (
-                <View 
-                  key={index} 
+                <View
+                  key={index}
                   style={[
-                    styles.dot, 
+                    styles.dot,
                     { backgroundColor: index === currentIndex ? Colors.textWhite : 'rgba(255,255,255,0.4)' }
-                  ]} 
+                  ]}
                 />
               ))}
             </View>
@@ -115,9 +128,9 @@ export default function LinkScreen() {
 
           <View style={styles.buttonContainer}>
             {/* DYNAMIC BUTTON TEXT */}
-            <PillButton 
-              title={`Connect ${selectedAccount?.name}`} 
-              onPress={handleStartConnection} 
+            <PillButton
+              title={`Connect ${selectedAccount?.name}`}
+              onPress={handleStartConnection}
               style={styles.translucentButton}
             />
           </View>
@@ -135,10 +148,10 @@ export default function LinkScreen() {
           </View>
 
           <View style={styles.buttonContainer}>
-            <PillButton 
-              title="Scanning ..." 
-              onPress={() => {}} 
-              isLoading={true} 
+            <PillButton
+              title="Scanning ..."
+              onPress={() => { }}
+              isLoading={true}
               style={styles.translucentButtonPeach}
             />
           </View>
@@ -172,7 +185,7 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 1, height: 1 },
     textShadowRadius: 2,
   },
-  
+
   contentWrapper: {
     flex: 1,
     justifyContent: 'space-between',
@@ -209,7 +222,7 @@ const styles = StyleSheet.create({
     textAlign: 'left',
     lineHeight: 28,
   },
-  
+
   // Pagination Styles
   pagination: {
     flexDirection: 'row',

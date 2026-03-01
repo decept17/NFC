@@ -122,17 +122,102 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
     # find the user email
     user = db.query(User).filter(User.email == form_data.username).first()
 
-    # Verify Password
-    if not user or not verify_password(form_data.password, user.password_hash):
+    # User not found -> Tell the app to show "Do you want to register?"
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Account not found. Would you like to register?",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    # User found but pass is wrong -> Tell app "Wrong password"
+    if not verify_password(form_data.password, user.password_hash):
         raise HTTPException(
             status_code= status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect email or password",
+            detail="Incorrect password",
             headers={"WWW-Authenticate": "Bearer"},
         )
     
     # Generate Token
     access_token = create_access_token(data={"sub": str(user.user_id)})
     return {"access_token": access_token, "token_type": "bearer"}
+
+class RegisterRequest(BaseModel):
+    email: str
+    password: str
+
+@app.post("/api/auth/register")
+def register(request: RegisterRequest, db: Session = Depends(get_db)):
+    """
+    Registers a new user and returns a JWT token immediately
+    """
+    # Check if user already exists
+    existing_user = db.query(User).filter(User.email == request.email).first()
+    if existing_user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Email already registered"
+        )
+    
+    # Hash password
+    from auth import get_password_hash
+    hashed_password = get_password_hash(request.password)
+
+    # Create new user
+    new_user = User(
+        email=request.email,
+        password_hash=hashed_password,
+        role="parent" # Defaulting to parent for registration flow
+    )
+    
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+
+    # Generate Token
+    access_token = create_access_token(data={"sub": str(new_user.user_id)})
+    return {"access_token": access_token, "token_type": "bearer"}
+
+class AddChildRequest(BaseModel):
+    name: str
+
+@app.post("/api/accounts/add-child")
+def add_child(
+    request: AddChildRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Creates a child user and their wallet account, linked to the logged-in parent.
+    """
+    if current_user.role != "parent":
+        raise HTTPException(status_code=403, detail="Only parents can add children")
+
+    # Create the child User
+    child = User(
+        role="child",
+        name=request.name,
+        parent_id=current_user.user_id,
+        # Children don't have email/password - they use NFC wristbands
+    )
+    db.add(child)
+    db.flush()  # Get the child's user_id without committing
+
+    # Create a wallet Account for the child
+    child_account = Account(
+        owner_id=child.user_id,
+        balance=0.00,
+    )
+    db.add(child_account)
+    db.commit()
+    db.refresh(child_account)
+
+    return {
+        "child_name": request.name,
+        "balance": float(child_account.balance),
+        "account_id": str(child_account.account_id),
+        "nfc_status": "Active"
+    }
 
 # ------ Account Routes ------
 @app.get("/api/accounts/my-family")
@@ -153,7 +238,7 @@ def get_my_family(current_user: User = Depends(get_current_user), db: Session = 
         account = db.query(Account).filter(Account.owner_id == child.user_id).first()
         if account:
             family_data.append({
-                "child_name": "Child Account", # You can add a 'name' field to User later
+                "child_name": child.name or "Child Account",
                 "balance": float(account.balance),
                 "account_id": account.account_id,
                 "nfc_status": account.status

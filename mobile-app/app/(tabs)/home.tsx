@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '@/constants/Colours';
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useFamily, Account } from '@/context/FamilyContext';
+import { fetchApi } from '@/services/api';
 import { router } from 'expo-router';
 
 const { width } = Dimensions.get('window');
@@ -15,9 +16,38 @@ export default function HomeScreen() {
 
   // Find the index of the selected account for the carousel
   const currentIndex = accounts.findIndex(acc => acc.id === selectedAccountId);
-  
-  // Safe fallback just in case
-  if (!selectedAccount) return null; 
+
+  // Safe fallback - show empty state if the parent has no children yet
+  if (!selectedAccount) {
+    return (
+      <SafeAreaView style={styles.emptyState}>
+        <View style={styles.header}>
+          <TouchableOpacity>
+            <Ionicons name="person-outline" size={28} color={Colors.buttonDark} />
+          </TouchableOpacity>
+          <Text style={styles.headerLogo}>N3XO</Text>
+          <TouchableOpacity onPress={() => router.push('/settings')}>
+            <Ionicons name="ellipsis-vertical" size={28} color={Colors.buttonDark} />
+          </TouchableOpacity>
+        </View>
+        <View style={styles.emptyContent}>
+          <Ionicons name="people-outline" size={80} color={Colors.textOrange} />
+          <Text style={styles.emptyTitle}>No Accounts Yet</Text>
+          <Text style={styles.emptySubtitle}>
+            Add a child account to get started. They'll be able to use their NFC wristband to make payments.
+          </Text>
+          <TouchableOpacity
+            style={styles.addChildBtn}
+            onPress={() => router.push('/add-child')}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="person-add-outline" size={20} color={Colors.textWhite} />
+            <Text style={styles.addChildBtnText}>Add Child</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   const isFrozen = selectedAccount.status === 'Frozen';
   const backgroundColor = isFrozen ? Colors.backgroundPeach : Colors.backgroundBlue;
@@ -29,22 +59,36 @@ export default function HomeScreen() {
     const slideSize = event.nativeEvent.layoutMeasurement.width;
     const index = event.nativeEvent.contentOffset.x / slideSize;
     const roundIndex = Math.round(index);
-    
+
     if (roundIndex !== currentIndex && accounts[roundIndex]) {
       // The user swiped! Tell the whole app that a new child is selected.
       setSelectedAccountId(accounts[roundIndex].id);
     }
   };
 
-  // 3. Toggle Status (updates global state so it persists if you leave the tab and come back)
-  const handleToggleStatus = () => {
-    const updatedAccounts = accounts.map( acc => {
-      if (acc.id === selectedAccountId) {
-        return { ...acc, status: isFrozen ? 'Active' : 'Frozen' };
+  // 3. Toggle Status (calls backend, updates global state)
+  const handleToggleStatus = async () => {
+    if (!selectedAccountId) return;
+    try {
+      const response = await fetchApi(`/accounts/${selectedAccountId}/freeze`, {
+        method: 'POST',
+      });
+      if (response.ok) {
+        const data = await response.json();
+        const updatedAccounts = accounts.map(acc => {
+          if (acc.id === selectedAccountId) {
+            return { ...acc, status: data.status };
+          }
+          return acc;
+        });
+        setAccounts(updatedAccounts);
+      } else {
+        alert("Failed to update status");
       }
-      return acc;
-    });
-    setAccounts(updatedAccounts);
+    } catch (error) {
+      console.error(error);
+      alert("An error occurred while communicating with the server");
+    }
   };
 
   // --- 3. RENDER COMPONENTS ---
@@ -60,15 +104,15 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor }]}>
-      
+
       {/* HEADER */}
       <View style={styles.header}>
         <TouchableOpacity>
           <Ionicons name="person-outline" size={28} color={Colors.buttonDark} />
         </TouchableOpacity>
-        
+
         <Text style={styles.headerLogo}>N3XO</Text>
-        
+
         <TouchableOpacity onPress={() => router.push('/settings')}>
           <Ionicons name="ellipsis-vertical" size={28} color={Colors.buttonDark} />
         </TouchableOpacity>
@@ -86,16 +130,16 @@ export default function HomeScreen() {
           onMomentumScrollEnd={handleScroll}
           bounces={false}
         />
-        
+
         {/* Pagination Dots */}
         <View style={styles.pagination}>
           {accounts.map((_, index) => (
-            <View 
-              key={index} 
+            <View
+              key={index}
               style={[
-                styles.dot, 
+                styles.dot,
                 { backgroundColor: index === currentIndex ? Colors.textWhite : 'rgba(255,255,255,0.4)' }
-              ]} 
+              ]}
             />
           ))}
         </View>
@@ -103,12 +147,22 @@ export default function HomeScreen() {
 
       {/* TOGGLE BUTTON (Freeze / Activate) */}
       <View style={styles.toggleSection}>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={[styles.toggleButton, { backgroundColor: toggleBtnColor }]}
           onPress={handleToggleStatus}
           activeOpacity={0.8}
         />
         <Text style={styles.toggleText}>{toggleBtnText}</Text>
+
+        {/* Add child shortcut */}
+        <TouchableOpacity
+          style={styles.addChildBtn}
+          onPress={() => router.push('/add-child')}
+          activeOpacity={0.8}
+        >
+          <Ionicons name="person-add-outline" size={20} color={Colors.textWhite} />
+          <Text style={styles.addChildBtnText}>Add Child</Text>
+        </TouchableOpacity>
       </View>
     </SafeAreaView>
   );
@@ -118,7 +172,29 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    // transition background color smoothly (optional enhancement later)
+  },
+  emptyState: {
+    flex: 1,
+    backgroundColor: Colors.backgroundBlue,
+  },
+  emptyContent: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 40,
+    gap: 16,
+  },
+  emptyTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: Colors.textWhite,
+    textAlign: 'center',
+  },
+  emptySubtitle: {
+    fontSize: 15,
+    color: 'rgba(255,255,255,0.7)',
+    textAlign: 'center',
+    lineHeight: 22,
   },
   header: {
     flexDirection: 'row',
@@ -136,7 +212,7 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 5, height: 5 },
     textShadowRadius: 2,
   },
-  
+
   // Carousel Styles
   carouselSection: {
     height: 300,
@@ -170,7 +246,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: '#000',
   },
-  
+
   // Pagination Styles
   pagination: {
     flexDirection: 'row',
@@ -205,6 +281,23 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '600',
     color: '#222',
+  },
+  addChildBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 24,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 30,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.3)',
+  },
+  addChildBtnText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: Colors.textWhite,
   },
 
   // Bottom Actions

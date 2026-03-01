@@ -18,7 +18,7 @@ class NFCTag(Base):
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     nfc_uid = Column(String, unique=True, nullable=False) # The physical chip ID
-    user_id = Column(String, ForeignKey('users.id'), nullable=False)
+    user_id = Column(UUID(as_uuid=True), ForeignKey('users.user_id'), nullable=False)
     status = Column(SQLAEnum(TagStatus), default=TagStatus.ACTIVE)
     label = Column(String, nullable=True) # e.g., "Blue Wristband"
     created_at = Column(DateTime, default= datetime.now)
@@ -33,10 +33,12 @@ class AccountType(str, enum.Enum):
 class Account(Base):
     __tablename__ = "accounts"
     account_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id = Column(String, ForeignKey("users.id"), nullable=False)
+    owner_id = Column(UUID(as_uuid=True), ForeignKey("users.user_id"), nullable=False)
     
     balance = Column(Numeric(12,2), default=0.00)
     account_type = Column(SQLAEnum(AccountType), default=AccountType.WALLET)
+    status = Column(String(20), default="Active", nullable=False)  # Active, Frozen, Lost
+    nfc_token_id = Column(String, nullable=True)  # The NFC tag UID linked to this account
 
     daily_limit = Column(Numeric(10, 2), nullable=True)
     
@@ -45,13 +47,12 @@ class Account(Base):
 
     created_at = Column(DateTime, default=datetime.now)
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.utcnow)
-   
 
     # relationship to transaction - allows sql to see transaction history
     transactions = relationship("Transaction", back_populates="account")
 
     # Relationship to User
-    user = relationship("User", back_populates="accounts")
+    user = relationship("User", foreign_keys=[owner_id], back_populates="accounts")
 
 class Transaction(Base):
     __tablename__ = "transactions"
@@ -88,6 +89,7 @@ class User(Base):
     __tablename__ = "users"
     user_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     role = Column(String, nullable=False, default="user") # Parent or Child
+    name = Column(String, nullable=True)  # Used for child display names
     #Nullable because children dont have them
     email = Column(String, unique=True, nullable=True)
     password_hash = Column(String, nullable=True)
@@ -97,4 +99,4 @@ class User(Base):
     nfc_tags = relationship("NFCTag", back_populates="user")
 
     # Link to the financial accounts 
-    accounts = relationship("Account", back_populates="user")
+    accounts = relationship("Account", foreign_keys="Account.owner_id", back_populates="user")

@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, KeyboardAvoidingView, Platform, TouchableWithoutFeedback, Keyboard, Alert} from 'react-native';
+import { View, Text, StyleSheet, KeyboardAvoidingView, Platform, TouchableWithoutFeedback, Keyboard, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useStripe, CardField } from '@stripe/stripe-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFamily } from '@/context/FamilyContext';
+import { fetchApi } from '@/services/api';
 
 // Reusing existing UI components
 import { Colors } from '@/constants/Colours';
@@ -16,14 +17,14 @@ export default function TopUpScreen() {
   const router = useRouter();
   const { createPaymentMethod } = useStripe();
   const { selectedAccount } = useFamily();
-  
+
   const [amount, setAmount] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(false);
   const [isCardComplete, setIsCardComplete] = useState<boolean>(false);
 
   const handleTopUp = async () => {
     const numericAmount = parseFloat(amount);
-    
+
     if (!amount || isNaN(numericAmount) || numericAmount <= 0) {
       Alert.alert("Invalid Amount", "Please enter a valid amount to top up.");
       return;
@@ -47,17 +48,23 @@ export default function TopUpScreen() {
         return;
       }
 
-      console.log("Success! Sending to backend:", {
-        accountId: selectedAccount?.id,
-        amount: numericAmount,
-        paymentMethodId: paymentMethod.id
+      // Call our FastAPI backend instead of just simulating success
+      const response = await fetchApi(`/accounts/${selectedAccount?.id}/topup`, {
+        method: 'POST',
+        body: JSON.stringify({
+          amount: numericAmount,
+          paymentMethodId: paymentMethod.id
+        })
       });
 
-      setTimeout(() => {
-        setLoading(false);
-        Alert.alert("Success!", `£${numericAmount.toFixed(2)} has been added to ${selectedAccount?.name}'s account.`);
-        router.push('/(tabs)/home');
-      }, 1500);
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || "Top up failed on server");
+      }
+
+      setLoading(false);
+      Alert.alert("Success!", `£${numericAmount.toFixed(2)} has been added to ${selectedAccount?.name}'s account.`);
+      router.push('/(tabs)/home');
 
     } catch (err) {
       console.error(err);
@@ -69,8 +76,8 @@ export default function TopUpScreen() {
   return (
     <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
       <SafeAreaView style={styles.safeArea}>
-        <KeyboardAvoidingView 
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'} 
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={styles.container}
         >
           <View style={styles.header}>
@@ -79,22 +86,22 @@ export default function TopUpScreen() {
             </TouchableOpacity>
             {/* DYNAMIC TITLE */}
             <Text style={styles.headerTitle}>Top Up {selectedAccount?.name}</Text>
-            <View style={{ width: 32 }} /> 
+            <View style={{ width: 32 }} />
           </View>
 
           <View style={styles.content}>
             <Text style={styles.label}>Enter Amount (£)</Text>
-            <PillInput 
-              placeholder="0.00" 
+            <PillInput
+              placeholder="0.00"
               value={amount}
               onChangeText={setAmount}
-              keyboardType="decimal-pad" 
+              keyboardType="decimal-pad"
             />
 
             <Text style={styles.label}>Payment Details</Text>
             <View style={styles.cardContainer}>
               <CardField
-                postalCodeEnabled={false} 
+                postalCodeEnabled={false}
                 onCardChange={(cardDetails) => {
                   setIsCardComplete(cardDetails.complete);
                 }}
@@ -108,8 +115,8 @@ export default function TopUpScreen() {
             </View>
 
             <View style={styles.buttonWrapper}>
-              <PillButton 
-                title={`Pay £${amount ? amount : '0.00'}`} 
+              <PillButton
+                title={`Pay £${amount ? amount : '0.00'}`}
                 onPress={handleTopUp}
                 isLoading={loading}
               />

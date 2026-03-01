@@ -1,63 +1,64 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, SectionList, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '@/constants/Colours';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFamily } from '@/context/FamilyContext';
-
-// --- 1. MOCK DATA (Mirrors your TransactionResponse from main.py) ---
-// We use dynamic dates so "Today" always works when you test it.
-const today = new Date();
-const lastWeek = new Date();
-lastWeek.setDate(today.getDate() - 7);
-
-const MOCK_TRANSACTIONS = [
-  { id: '1', description: 'School Lunch', amount: 5.99, timestamp: today.toISOString(), category: 'Food' },
-  { id: '2', description: 'Stationery', amount: 2.99, timestamp: today.toISOString(), category: 'Supplies' },
-  { id: '3', description: 'Bus Fare', amount: 5.96, timestamp: lastWeek.toISOString(), category: 'Transport' },
-  { id: '4', description: 'School Trip', amount: 9.99, timestamp: lastWeek.toISOString(), category: 'Activities' },
-  { id: '5', description: 'Vending Machine', amount: 5.00, timestamp: lastWeek.toISOString(), category: 'Food' },
-];
+import { fetchApi } from '@/services/api';
 
 export default function HistoryScreen() {
   const router = useRouter();
 
   // get child
-  const {selectedAccount} = useFamily();
+  const { selectedAccount } = useFamily();
+
+  const [historyItems, setHistoryItems] = useState<any[]>([]);
+
+  useEffect(() => {
+    const fetchHistory = async () => {
+      if (!selectedAccount?.id) return;
+      try {
+        const response = await fetchApi(`/accounts/${selectedAccount.id}/history`);
+        if (response.ok) {
+          const data = await response.json();
+          setHistoryItems(data);
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    };
+    fetchHistory();
+  }, [selectedAccount?.id]);
 
   // --- 2. HELPER FUNCTION: Group data by date ---
-  const groupTransactions = (transactions: typeof MOCK_TRANSACTIONS) => {
+  const groupTransactions = (transactions: any[]) => {
+    const today = new Date();
 
-    // filter transactions for specific child
-    const childTransactions = transactions.filter(t => t.id === selectedAccount?.id);
-
-    // In a real app, you'd use a date library like date-fns or moment.js
-    // For now, we manually group them into "Today" and "Last Week"
     const todayItems = transactions.filter(t => new Date(t.timestamp).toDateString() === today.toDateString());
     const olderItems = transactions.filter(t => new Date(t.timestamp).toDateString() !== today.toDateString());
 
     return [
       { title: 'Today', data: todayItems },
-      { title: 'This Week', data: olderItems },
+      { title: 'Older', data: olderItems },
     ].filter(section => section.data.length > 0);
   };
 
-  const sections = groupTransactions(MOCK_TRANSACTIONS);
+  const sections = groupTransactions(historyItems);
 
   // --- 3. RENDER COMPONENTS ---
 
-  const renderItem = ({ item }: { item: typeof MOCK_TRANSACTIONS[0] }) => (
+  const renderItem = ({ item }: { item: any }) => (
     <View style={styles.transactionRow}>
       <Text style={styles.itemDescription} numberOfLines={1}>
         {item.description}
       </Text>
-      
+
       {/* Dashed Line spacer */}
       <View style={styles.dashedLineContainer}>
         <View style={styles.dashedLine} />
       </View>
-      
+
       <Text style={styles.itemAmount}>
         £{item.amount.toFixed(2)}
       </Text>
@@ -70,7 +71,7 @@ export default function HistoryScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      
+
       {/* HEADER */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.push('/(tabs)/home')}>
@@ -82,7 +83,7 @@ export default function HistoryScreen() {
           <Text style={styles.headerLogo}>N3XO</Text>
           <Text style={styles.subHeader}>{selectedAccount?.name}'s History</Text>
         </View>
-        
+
         <TouchableOpacity onPress={() => router.push('/settings')}>
           <Ionicons name="ellipsis-vertical" size={28} color={Colors.buttonDark} />
         </TouchableOpacity>
@@ -99,8 +100,8 @@ export default function HistoryScreen() {
         stickySectionHeadersEnabled={false}
         ListEmptyComponent={<Text style={styles.emptyText}>No recent transactions.</Text>}
       />
-        <View style={styles.bottomButtonContainer}>
-          <TouchableOpacity style={styles.viewAllButton}>
+      <View style={styles.bottomButtonContainer}>
+        <TouchableOpacity style={styles.viewAllButton}>
           <Text style={styles.viewAllText}>View Entire History</Text>
         </TouchableOpacity>
       </View>
@@ -112,7 +113,7 @@ export default function HistoryScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: Colors.backgroundPeach, 
+    backgroundColor: Colors.backgroundPeach,
   },
   header: {
     flexDirection: 'row',
@@ -130,7 +131,7 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 5, height: 5 },
     textShadowRadius: 2,
   },
-  
+
   // List Styles
   listContent: {
     paddingHorizontal: 30,
