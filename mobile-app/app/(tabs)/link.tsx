@@ -7,6 +7,7 @@ import { Colors } from '@/constants/Colours';
 import { PillButton } from '@/components/PillButton';
 import { useFamily } from '@/context/FamilyContext';
 import { fetchApi } from '@/services/api';
+import NfcManager, { NfcTech } from 'react-native-nfc-manager';
 
 const { width } = Dimensions.get('window');
 
@@ -46,34 +47,71 @@ export default function LinkScreen() {
     }
   };
 
-  const handleStartConnection = () => {
+  const handleStartConnection = async () => {
     setIsConnecting(true);
 
-    // Simulate NFC Read with a delay, since real NFC integration is for Sprint 2 Phase 3
-    setTimeout(async () => {
-      try {
-        const fakeUid = "SCANNED_TAG_" + Math.random().toString().slice(2, 8);
-        const response = await fetchApi(`/accounts/${selectedAccount?.id}/link-nfc`, {
-          method: 'POST',
-          body: JSON.stringify({ nfc_uid: fakeUid })
-        });
-
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.detail || "Linking failed on backend.");
-        }
-
-        Alert.alert(
-          "Success!",
-          `${selectedAccount?.name}'s NFC Band linked successfully.`,
-          [{ text: "OK", onPress: () => router.push('/(tabs)/home') }]
-        );
-      } catch (error: any) {
-        Alert.alert("Error", error.message || "Something went wrong.");
-      } finally {
-        setIsConnecting(false);
+    try {
+      // 1. Initialize NFC and verify it's supported
+      await NfcManager.start();
+      const isSupported = await NfcManager.isSupported();
+      if (!isSupported) {
+        throw new Error('NFC is not supported on this device');
       }
-    }, 2000);
+
+      const isEnabled = await NfcManager.isEnabled();
+      if (!isEnabled) {
+        throw new Error('Please enable NFC in your device settings');
+      }
+
+      // 2. Request Android NFC scanning dialog / iOS sheet
+      await NfcManager.requestTechnology(NfcTech.Ndef);
+
+      // 3. Read the tag ID from the hardware
+      const tag = await NfcManager.getTag();
+
+      if (!tag || !tag.id) {
+        throw new Error('new tag collected - Empty tag');
+      }
+
+      // tag.id from react-native-nfc-manager is a byte array like [4, 123, 45, ...]
+      // We must convert it to a hex string for the backend (e.g. "047B2D...")
+      const rawId = tag.id;
+      const nfcUid: string = Array.isArray(rawId)
+        ? (rawId as number[]).map(b => b.toString(16).padStart(2, '0')).join('').toUpperCase()
+        : String(rawId);
+
+      console.log('[NFC] Tag scanned. Raw id:', JSON.stringify(rawId), '-> UID string:', nfcUid);
+
+      // 4. Send the real hardware UID to the backend
+      const response = await fetchApi(`/accounts/${selectedAccount?.id}/link-nfc`, {
+        method: 'POST',
+        body: JSON.stringify({ nfc_uid: nfcUid })
+      });
+
+      if (!response.ok) {
+        // Safely parse the error – the server might return HTML on unexpected crashes
+        let errorDetail = "Linking failed on backend.";
+        try {
+          const errorData = await response.json();
+          errorDetail = errorData.detail || errorDetail;
+        } catch {
+          errorDetail = `Server error (${response.status})`;
+        }
+        throw new Error(errorDetail);
+      }
+
+      Alert.alert(
+        "Success!",
+        `${selectedAccount?.name}'s NFC Band linked successfully.`,
+        [{ text: "OK", onPress: () => router.push('/(tabs)/home') }]
+      );
+    } catch (error: any) {
+      Alert.alert("Error", error.message || "Something went wrong.");
+    } finally {
+      // 5. Very important: Turn off the NFC scanner when done or failed
+      NfcManager.cancelTechnologyRequest();
+      setIsConnecting(false);
+    }
   };
 
   const renderInstructionCard = ({ item }: { item: typeof INSTRUCTIONS[0] }) => (

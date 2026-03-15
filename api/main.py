@@ -3,12 +3,13 @@ from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from db.database import get_db
 from services.services import PaymentService
-from db.models import Account, Merchant, User, Transaction
+from db.models import Account, Merchant, User, Transaction, NFCTag
 from typing import List
 from pydantic import BaseModel, Field
 from uuid import UUID
 from auth import create_access_token, verify_password, get_current_user
 from datetime import datetime
+from auth import get_password_hash
 
 app = FastAPI(title="NFC API Backend")
 
@@ -50,12 +51,21 @@ def link_nfc_tag(
         raise HTTPException(status_code=403, detail="Not authorized")
 
     # 2. Check if tag is already used by someone else
-    existing_tag = db.query(Account).filter(Account.nfc_token_id == request.nfc_uid).first()
+    existing_tag = db.query(NFCTag).filter(NFCTag.nfc_uid == request.nfc_uid).first()
     if existing_tag:
-         raise HTTPException(status_code=400, detail="This NFC tag is already linked to another account")
+         raise HTTPException(status_code=400, detail="This NFC tag is already linked")
 
-    # 3. Save the Link
+    # 3. Save the Link (Account table and NFCTag table)
     account.nfc_token_id = request.nfc_uid
+    
+    # CRITICAL FIX: Create the actual NFCTag record expected by your PaymentService
+    new_tag = NFCTag(
+        nfc_uid=request.nfc_uid,
+        user_id=account.owner_id,
+        status='active',
+        label=f"{child.name}'s Wristband" if child.name else "Wristband"
+    )
+    db.add(new_tag)
     db.commit()
     
     return {"success": True, "message": "Wristband linked successfully"}
@@ -160,7 +170,6 @@ def register(request: RegisterRequest, db: Session = Depends(get_db)):
         )
     
     # Hash password
-    from auth import get_password_hash
     hashed_password = get_password_hash(request.password)
 
     # Create new user

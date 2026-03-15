@@ -1,5 +1,4 @@
 from sqlalchemy import Column, String, Numeric, ForeignKey, DateTime, JSON, Boolean
-from sqlalchemy import Enum as SQLAEnum
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
@@ -8,23 +7,22 @@ import enum
 import uuid
 from .database import Base
 
-class TagStatus(str, enum.Enum):
-    ACTIVE = "active"
-    FROZEN = "frozen"   # User temporarily locks card
-    LOST = "lost"       # Permanent deactivation
 
 class NFCTag(Base):
     __tablename__ = 'nfc_tags'
 
-    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     nfc_uid = Column(String, unique=True, nullable=False) # The physical chip ID
     user_id = Column(UUID(as_uuid=True), ForeignKey('users.user_id'), nullable=False)
-    status = Column(SQLAEnum(TagStatus), default=TagStatus.ACTIVE)
+    # Use String to match the native 'tag_status' enum already created in init.sql
+    status = Column(String, default='active')
     label = Column(String, nullable=True) # e.g., "Blue Wristband"
-    created_at = Column(DateTime, default= datetime.now)
-    
+    created_at = Column(DateTime, default=datetime.now)
+    last_used_at = Column(DateTime, nullable=True)
+
     # Link back to User
     user = relationship("User", back_populates="nfc_tags")
+
 
 class AccountType(str, enum.Enum):
     WALLET = "wallet" # Internal digital money
@@ -36,7 +34,7 @@ class Account(Base):
     owner_id = Column(UUID(as_uuid=True), ForeignKey("users.user_id"), nullable=False)
     
     balance = Column(Numeric(12,2), default=0.00)
-    account_type = Column(SQLAEnum(AccountType), default=AccountType.WALLET)
+    account_type = Column(String, default="wallet")
     status = Column(String(20), default="Active", nullable=False)  # Active, Frozen, Lost
     nfc_token_id = Column(String, nullable=True)  # The NFC tag UID linked to this account
 

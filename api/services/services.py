@@ -3,7 +3,7 @@ import stripe
 from sqlalchemy.orm import Session
 from sqlalchemy import select, func
 from datetime import date
-from db.models import Account, Transaction, Limit, NFCTag, TagStatus, AccountType
+from db.models import Account, Transaction, Limit, NFCTag
 
 stripe.api_key = os.getenv("PAYMENT_GATEWAY_SECRET_KEY")
 
@@ -69,17 +69,17 @@ class PaymentService:
                 return {"success": False, "message": "NFC Token not recognized"}
             
             # check the wristband status 
-            if tag.status == TagStatus.FROZEN:
+            if tag.status == 'frozen':
                 return {"success": False, "message": "Transaction declined: Wristband is Frozen"}
-            if tag.status == TagStatus.LOST:
+            if tag.status == 'lost':
                 return {"success": False, "message": "Transaction declined: Wristband reported Lost"}
             
             # Get the account, traversing from Tag -> User -> Account
             # Lock the account row to prevent double spending 
             user = tag.user
             stmt = select(Account).filter(
-                Account.user_id == user.id,
-                Account.account_type == AccountType.WALLET
+                Account.owner_id == user.user_id,
+                Account.account_type == 'wallet'
                 ).with_for_update()
             
             account = db.execute(stmt).scalar_one_or_none()

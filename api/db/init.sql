@@ -114,9 +114,9 @@ CREATE TABLE transactions (
 );
 CREATE TYPE tag_status AS ENUM ('active', 'frozen', 'lost');
 CREATE TABLE nfc_tags (
-    id VARCHAR PRIMARY KEY,
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     nfc_uid VARCHAR UNIQUE NOT NULL,
-    user_id VARCHAR NOT NULL REFERENCES users(id),
+    user_id UUID NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
     status tag_status DEFAULT 'active',
     label VARCHAR,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
