@@ -10,49 +10,74 @@ stripe.api_key = os.getenv("PAYMENT_GATEWAY_SECRET_KEY")
 class PaymentService:
     
     # ---------------------------------------------------------
-    #  PARENT TOPS UP (Money In)
+    #  PARENT TOPS UP (Money In) - Step 1: Create Intent
     # ---------------------------------------------------------
+    # The backend only creates the PaymentIntent and returns the client_secret.
+    # The mobile Stripe SDK uses the secret to confirm the payment (with 3DS if needed).
+    # The DB balance is updated ONLY via the secure Stripe webhook (see main.py /webhook).
     @staticmethod
-    def top_up(db: Session, account_id: str, amount: float, payment_method_id: str):
+    def create_top_up_intent(amount: float, account_id: str):
         try:
-            # Charge the parent. Money sits in my Platform account.
+            # Create the Intent but DO NOT confirm it yet.
+            # We attach account_id to metadata so our webhook knows who to credit.
             intent = stripe.PaymentIntent.create(
                 amount=int(amount * 100),
                 currency="gbp",
-                payment_method=payment_method_id,
-                confirm=True,
                 metadata={"account_id": account_id}
             )
-            
-            # Update DB balance
-            account = db.query(Account).filter(Account.account_id == account_id).first()
-            if not account: return None
-            
-            account.balance = float(account.balance) + amount
-
-            # Log it, saving the charge ID so we can refund it later if needed
-            tx = Transaction(
-                account_id=account_id,
-                amount=amount,
-                type='TopUp',
-                status='Success',
-                stripe_charge_id=intent.id 
-            )
-            db.add(tx)
-
-            # RECORD HISTORY
-            top_up_txn = Transaction(
-                account_id=account.account_id,
-                amount=amount, # Positive for deposit
-                description="Parent Top Up",
-                category="Transfer")
-            db.add(top_up_txn)
-
-            db.commit()
-            return {"success": True, "new_balance": account.balance}
+            # Return the client_secret to the mobile app so it can confirm the payment
+            return {"success": True, "clientSecret": intent.client_secret}
 
         except Exception as e:
-            db.rollback()
+            return {"success": False, "message": str(e)}
+
+    # ---------------------------------------------------------
+    #  PARENT TOPS UP (Money In) - Via Stripe Checkout Link
+    # ---------------------------------------------------------
+    # Creates a Stripe Checkout Session and returns a hosted URL.
+    # The parent is redirected to this URL via an in-app browser.
+    # On success, the existing webhook (payment_intent.succeeded)
+    # credits the balance — no changes needed there.
+    @staticmethod
+    def create_checkout_session(amount: float, account_id: str, base_url: str, success_url: str | None = None, cancel_url: str | None = None):
+        try:
+            from urllib.parse import quote
+            
+            # Use deep links if provided by the app, otherwise fallback to our HTML pages
+            # Stripe requires http/https for success_url and cancel_url, so if they are deep links (e.g. exp://), 
+            # we must route them through a backend redirect endpoint.
+            if success_url and not success_url.startswith("http"):
+                final_success_url = f"{base_url}/checkout/redirect?to={quote(success_url)}"
+            else:
+                final_success_url = success_url if success_url else f"{base_url}/checkout/success"
+                
+            if cancel_url and not cancel_url.startswith("http"):
+                final_cancel_url = f"{base_url}/checkout/redirect?to={quote(cancel_url)}"
+            else:
+                final_cancel_url = cancel_url if cancel_url else f"{base_url}/checkout/cancel"
+
+            session = stripe.checkout.Session.create(
+                payment_method_types=["card", "link"],
+                mode="payment",
+                line_items=[{
+                    "price_data": {
+                        "currency": "gbp",
+                        "unit_amount": int(amount * 100),
+                        "product_data": {
+                            "name": "Account Top-Up",
+                        },
+                    },
+                    "quantity": 1,
+                }],
+                payment_intent_data={
+                    "metadata": {"account_id": account_id},
+                },
+                success_url=final_success_url,
+                cancel_url=final_cancel_url,
+            )
+            return {"success": True, "url": session.url}
+
+        except Exception as e:
             return {"success": False, "message": str(e)}
 
     # ---------------------------------------------------------

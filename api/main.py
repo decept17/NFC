@@ -1,4 +1,5 @@
-from fastapi import FastAPI, Depends, HTTPException, Body, status
+from fastapi import FastAPI, Depends, HTTPException, Body, status, Request
+from fastapi.responses import HTMLResponse
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from db.database import get_db
@@ -10,6 +11,11 @@ from uuid import UUID
 from auth import create_access_token, verify_password, get_current_user
 from datetime import datetime
 from auth import get_password_hash
+from fastapi.responses import RedirectResponse
+import os
+import stripe
+
+stripe.api_key = os.getenv("PAYMENT_GATEWAY_SECRET_KEY")
 
 app = FastAPI(title="NFC API Backend")
 
@@ -285,16 +291,23 @@ def get_balance(account_id: UUID, current_user: User = Depends(get_current_user)
     
     return {"balance": float(account.balance)}
 
-@app.post("/api/accounts/{account_id}/topup")
-def top_up(
-    account_id: UUID, 
-    amount: float = Body(..., embed=True), 
-    paymentMethodId: str =Body(..., embed=True) ,
-    current_user: User = Depends(get_current_user) ,
-    db:Session = Depends(get_db)):
-
-    # Parent loads money onto a childs band
-    
+@app.post("/api/accounts/{account_id}/create-checkout-session")
+def create_checkout_session(
+    account_id: UUID,
+    request: Request,
+    amount: float = Body(..., embed=True),
+    success_url: str = Body(None, embed=True),
+    cancel_url: str = Body(None, embed=True),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Step 1 of the top-up flow.
+    Creates a Stripe Checkout Session and returns the hosted URL.
+    The mobile app opens this URL in an in-app browser where the
+    parent completes payment via Stripe Link, card, etc.
+    The DB balance is updated ONLY by the /webhook route below.
+    """
     # 1. Role Check
     if current_user.role != 'parent':
         raise HTTPException(status_code=403, detail="Only parents can top up accounts")
@@ -304,29 +317,108 @@ def top_up(
     if not account:
         raise HTTPException(status_code=404, detail="Account not found")
 
-    # Find who owns this account
     child_owner = db.query(User).filter(User.user_id == account.owner_id).first()
-    
-    # Security Check: Is this MY child?
     if not child_owner or child_owner.parent_id != current_user.user_id:
         raise HTTPException(status_code=403, detail="You can only top up your own children's accounts")
 
     if amount <= 0:
         raise HTTPException(status_code=400, detail="Invalid amount")
-    
-    result = PaymentService.top_up(db, account_id, amount, paymentMethodId)
 
-    if not result:
-        raise HTTPException(status_code=404, detail="Account not found")
-    
-    if "success" in result and result["success"] is False:
-        raise HTTPException(status_code=400, detail=result["message"])
-    
-    return result
+    # Build the base URL from the incoming request so redirect URLs point to our API
+    base_url = str(request.base_url).rstrip("/")
+    result = PaymentService.create_checkout_session(amount, str(account_id), base_url, success_url, cancel_url)
+
+    if not result.get("success"):
+        raise HTTPException(status_code=400, detail=result.get("message"))
+
+    return {"url": result["url"]}
+
+
+# --- Checkout redirect pages (shown inside the in-app browser after Stripe) ---
+
+@app.get("/checkout/success", response_class=HTMLResponse)
+def checkout_success():
+    return """
+    <html>
+    <head><meta name="viewport" content="width=device-width, initial-scale=1"></head>
+    <body style="display:flex;justify-content:center;align-items:center;height:100vh;
+                 font-family:system-ui,sans-serif;background:#e6f4fe;margin:0;">
+      <div style="text-align:center;padding:40px;">
+        <h1 style="color:#1a7f37;font-size:28px;">✅ Payment Successful!</h1>
+        <p style="color:#333;font-size:18px;">Your top-up is being processed.<br>You can close this page and return to the app.</p>
+      </div>
+    </body>
+    </html>
+    """
+
+@app.get("/checkout/redirect")
+def checkout_redirect(to: str):
+    """
+    Redirects to a deep link. This is used as the Stripe success/cancel URL because
+    Stripe requires HTTP/HTTPS URLs, but we want to return the user to the app via a deep link.
+    """
+    return RedirectResponse(url=to)
+
+@app.get("/checkout/cancel", response_class=HTMLResponse)
+def checkout_cancel():
+    return """
+    <html>
+    <head><meta name="viewport" content="width=device-width, initial-scale=1"></head>
+    <body style="display:flex;justify-content:center;align-items:center;height:100vh;
+                 font-family:system-ui,sans-serif;background:#fef2e6;margin:0;">
+      <div style="text-align:center;padding:40px;">
+        <h1 style="color:#c44;font-size:28px;">❌ Payment Cancelled</h1>
+        <p style="color:#333;font-size:18px;">No charge was made.<br>You can close this page and return to the app.</p>
+      </div>
+    </body>
+    </html>
+    """
+
+
+@app.post("/webhook")
+async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
+    """
+    Stripe calls this endpoint after a payment is confirmed on the user's device.
+    This is the ONLY place the DB balance is updated — making it tamper-proof.
+    Set STRIPE_WEBHOOK_SECRET in your .env from the Stripe Dashboard.
+    """
+    payload = await request.body()
+    sig_header = request.headers.get("stripe-signature")
+    webhook_secret = os.getenv("STRIPE_WEBHOOK_SECRET")
+
+    try:
+        event = stripe.Webhook.construct_event(payload, sig_header, webhook_secret)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    # Only act on successful payments
+    if event["type"] == "payment_intent.succeeded":
+        intent = event["data"]["object"]
+        account_id = intent.get("metadata", {}).get("account_id")
+        amount_gbp = intent["amount"] / 100.0
+
+        if account_id:
+            account = db.query(Account).filter(Account.account_id == account_id).first()
+            if account:
+                # Safely update the DB balance
+                account.balance = float(account.balance) + amount_gbp
+
+                # Log the transaction with the Stripe PaymentIntent ID for refund traceability
+                tx = Transaction(
+                    account_id=account_id,
+                    amount=amount_gbp,
+                    type="TopUp",
+                    status="Success",
+                    stripe_charge_id=intent["id"],
+                )
+                db.add(tx)
+                db.commit()
+
+    return {"status": "success"}
 
 # ----- Transaction Routes -----
 # *** This isnt protected by current_user because the school terminal calls it not parent
-# In next spring use an API key for the terminal
+# In next sprint use an API key for the terminal
 @app.post("/api/transactions/pay")
 def process_payment(
     nfcTokenId: str = Body(...),

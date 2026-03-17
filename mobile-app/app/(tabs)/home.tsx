@@ -1,18 +1,34 @@
 // mobile-app/app/(tabs)/home.tsx
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import { View, Text, StyleSheet, Dimensions, FlatList, TouchableOpacity, } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '@/constants/Colours';
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useFamily, Account } from '@/context/FamilyContext';
 import { fetchApi } from '@/services/api';
-import { router } from 'expo-router';
+import { router, useFocusEffect, useNavigation } from 'expo-router';
 
 const { width } = Dimensions.get('window');
 
 export default function HomeScreen() {
   // 1. Hook into the Global Context instead of local state!
-  const { accounts, setAccounts, selectedAccountId, setSelectedAccountId, selectedAccount } = useFamily();
+  const { accounts, setAccounts, selectedAccountId, setSelectedAccountId, selectedAccount, refreshAccounts } = useFamily();
+  const navigation = useNavigation();
+
+  React.useEffect(() => {
+    const unsubscribe = (navigation as any).addListener('tabPress', (e: any) => {
+      // Trigger a refresh when the home tab icon is pressed (even if already on the home screen)
+      refreshAccounts();
+    });
+
+    return unsubscribe;
+  }, [navigation, refreshAccounts]);
+
+  useFocusEffect(
+    useCallback(() => {
+      refreshAccounts();
+    }, [])
+  );
 
   // Find the index of the selected account for the carousel
   const currentIndex = accounts.findIndex(acc => acc.id === selectedAccountId);

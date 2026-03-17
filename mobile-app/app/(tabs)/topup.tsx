@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, KeyboardAvoidingView, Platform, TouchableWithoutFeedback, Keyboard, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { useStripe, CardField } from '@stripe/stripe-react-native';
+import * as WebBrowser from 'expo-web-browser';
+import * as Linking from 'expo-linking';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFamily } from '@/context/FamilyContext';
 import { fetchApi } from '@/services/api';
@@ -15,12 +16,10 @@ import { TouchableOpacity } from 'react-native';
 
 export default function TopUpScreen() {
   const router = useRouter();
-  const { createPaymentMethod } = useStripe();
   const { selectedAccount } = useFamily();
 
   const [amount, setAmount] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(false);
-  const [isCardComplete, setIsCardComplete] = useState<boolean>(false);
 
   const handleTopUp = async () => {
     const numericAmount = parseFloat(amount);
@@ -30,45 +29,53 @@ export default function TopUpScreen() {
       return;
     }
 
-    if (!isCardComplete) {
-      Alert.alert("Incomplete Details", "Please fill out all card details.");
-      return;
-    }
-
     setLoading(true);
 
     try {
-      const { paymentMethod, error } = await createPaymentMethod({
-        paymentMethodType: 'Card',
-      });
+      // Create deep links to automatically return to the app
+      const returnUrlSuccess = Linking.createURL('/(tabs)/home', { queryParams: { payment: 'success' } });
+      const returnUrlCancel = Linking.createURL('/(tabs)/home', { queryParams: { payment: 'cancel' } });
 
-      if (error) {
-        Alert.alert("Payment Failed", error.message);
-        setLoading(false);
-        return;
-      }
-
-      // Call our FastAPI backend instead of just simulating success
-      const response = await fetchApi(`/accounts/${selectedAccount?.id}/topup`, {
+      // Step 1: Ask our backend to create a Stripe Checkout Session
+      const response = await fetchApi(`/accounts/${selectedAccount?.id}/create-checkout-session`, {
         method: 'POST',
-        body: JSON.stringify({
+        body: JSON.stringify({ 
           amount: numericAmount,
-          paymentMethodId: paymentMethod.id
-        })
+          success_url: returnUrlSuccess,
+          cancel_url: returnUrlCancel
+        }),
       });
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.detail || "Top up failed on server");
+        throw new Error(errorData.detail || "Failed to initialise payment");
       }
 
-      setLoading(false);
-      Alert.alert("Success!", `£${numericAmount.toFixed(2)} has been added to ${selectedAccount?.name}'s account.`);
-      router.push('/(tabs)/home');
+      const { url } = await response.json();
+
+      // Step 2: Open the Stripe Checkout page
+      // openAuthSessionAsync handles the redirect URL. Once Stripe redirects to `mobileapp://...` 
+      // the browser safely closes and brings the user back into the app natively.
+      const result = await WebBrowser.openAuthSessionAsync(url, Linking.createURL('/'));
+
+      if (result.type === 'success') {
+        if (result.url.includes('payment=success')) {
+          Alert.alert(
+            "Success!",
+            `£${numericAmount.toFixed(2)} has been added to ${selectedAccount?.name}'s account.`
+          );
+          router.push('/(tabs)/home');
+        } else {
+          Alert.alert("Cancelled", "Payment was cancelled.");
+        }
+      } else if (result.type === 'cancel' || result.type === 'dismiss') {
+        Alert.alert("Cancelled", "Payment was closed.");
+      }
 
     } catch (err) {
       console.error(err);
       Alert.alert("Error", "Something went wrong.");
+    } finally {
       setLoading(false);
     }
   };
@@ -97,22 +104,6 @@ export default function TopUpScreen() {
               onChangeText={setAmount}
               keyboardType="decimal-pad"
             />
-
-            <Text style={styles.label}>Payment Details</Text>
-            <View style={styles.cardContainer}>
-              <CardField
-                postalCodeEnabled={false}
-                onCardChange={(cardDetails) => {
-                  setIsCardComplete(cardDetails.complete);
-                }}
-                style={styles.cardField}
-                cardStyle={{
-                  backgroundColor: '#FFFFFF',
-                  textColor: '#000000',
-                  borderRadius: 8,
-                }}
-              />
-            </View>
 
             <View style={styles.buttonWrapper}>
               <PillButton
@@ -162,15 +153,6 @@ const styles = StyleSheet.create({
     marginLeft: '10%',
     marginBottom: 10,
     marginTop: 20,
-  },
-  cardContainer: {
-    width: '80%',
-    height: 50,
-    marginVertical: 10,
-  },
-  cardField: {
-    width: '100%',
-    height: '100%',
   },
   buttonWrapper: {
     marginTop: 50,
