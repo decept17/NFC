@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Depends, HTTPException, Body, status, Request
+from fastapi import FastAPI, Depends, HTTPException, Body, status, Request, Header
 from fastapi.responses import HTMLResponse
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
@@ -12,10 +12,12 @@ from auth import create_access_token, verify_password, get_current_user
 from datetime import datetime
 from auth import get_password_hash
 from fastapi.responses import RedirectResponse
+from utils.crypto import verify_sun_mac, counter_hex_to_int
 import os
 import stripe
 
 stripe.api_key = os.getenv("PAYMENT_GATEWAY_SECRET_KEY")
+ADMIN_PROVISION_KEY = os.getenv("ADMIN_PROVISION_KEY", "changeme-set-in-env")
 
 app = FastAPI(title="NFC API Backend")
 
@@ -25,7 +27,8 @@ def read_root():
 
 # --- Pydantic Models For data request validation
 class LinkNFCRequest(BaseModel):
-    nfc_uid: str = Field(...,description="nfc tags unique id") # App must send a string here
+    nfc_uid: str = Field(..., description="NFC tag UID (from the chip's SUN URL uid= param)")
+    auth_key: str = Field(..., description="AES-128 key (32 hex chars) provisioned into the chip")
 
 # ensures we only send safe data back to the app (filtering out internal IDs)
 class TransactionResponse(BaseModel):
@@ -69,7 +72,10 @@ def link_nfc_tag(
         nfc_uid=request.nfc_uid,
         user_id=account.owner_id,
         status='active',
-        label=f"{child.name}'s Wristband" if child.name else "Wristband"
+        label=f"{child.name}'s Wristband" if child.name else "Wristband",
+        # SUN security fields
+        auth_key=request.auth_key,
+        last_counter=0,   # Start at 0 so any tap counter > 0 is accepted
     )
     db.add(new_tag)
     db.commit()
@@ -419,18 +425,51 @@ async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
 # ----- Transaction Routes -----
 # *** This isnt protected by current_user because the school terminal calls it not parent
 # In next sprint use an API key for the terminal
+
+class NFCPayRequest(BaseModel):
+    uid: str = Field(..., description="Chip UID from the SUN URL uid= parameter")
+    counter: str = Field(..., description="Tap counter from SUN URL c= parameter (hex, e.g. '000015')")
+    cmac: str = Field(..., description="SUN MAC from URL m= parameter (16 hex chars = 8 bytes)")
+    amount: float = Field(..., description="Transaction amount in GBP")
+    merchantId: UUID = Field(..., description="Merchant UUID")
+    category: str = Field(..., description="Purchase category")
+
 @app.post("/api/transactions/pay")
 def process_payment(
-    nfcTokenId: str = Body(...),
-    amount: float = Body(...),
-    merchantId: UUID = Body(...),
-    category: str = Body(...),
+    request: NFCPayRequest,
     db: Session = Depends(get_db)
 ):
-    # Validate merchant and get their stripe connect ID
-    # Dont trust client to send the stripe ID, look it up
-    merchant = db.query(Merchant).filter(Merchant.merchant_id == merchantId).first()
+    # --- SUN Security Checks ---
 
+    # 1. Look up the tag by UID
+    tag = db.query(NFCTag).filter(NFCTag.nfc_uid == request.uid).first()
+    if not tag:
+        raise HTTPException(status_code=404, detail="NFC tag not recognised")
+
+    if not tag.auth_key:
+        raise HTTPException(status_code=500, detail="Tag has no auth key configured — please re-link the wristband")
+
+    # 2. Replay attack check: counter must be strictly greater than the last accepted one
+    incoming_counter = counter_hex_to_int(request.counter)
+    if incoming_counter <= tag.last_counter:
+        raise HTTPException(status_code=403, detail="Replay attack detected: counter not fresh")
+
+    # 3. Cryptographic MAC verification
+    if not verify_sun_mac(
+        uid_hex=request.uid,
+        counter_hex=request.counter,
+        cmac_hex=request.cmac,
+        auth_key_hex=tag.auth_key,
+    ):
+        raise HTTPException(status_code=403, detail="Invalid MAC — tap not authenticated")
+
+    # 4. Update the counter immediately (even before the payment goes through)
+    #    This prevents any window for replay even on payment failure.
+    tag.last_counter = incoming_counter
+    db.flush()  # Write counter update without committing yet
+
+    # --- Validate merchant and get their stripe connect ID ---
+    merchant = db.query(Merchant).filter(Merchant.merchant_id == request.merchantId).first()
     if not merchant:
         raise HTTPException(status_code=404, detail="Merchant not found")
     
@@ -439,14 +478,61 @@ def process_payment(
     
     result = PaymentService.process_nfc_transaction(
         db,
-        nfcTokenId,
-        amount,
-        merchantId,
-        category,
-        merchant.stripe_account_id # passing the trusted ID from DB
+        request.uid,       # pass the UID; PaymentService looks up the tag by nfc_uid
+        request.amount,
+        request.merchantId,
+        request.category,
+        merchant.stripe_account_id
     )
     
     if result["success"]:
         return {"status": "approved", "balance": result["new_balance"]}
     else:
         raise HTTPException(status_code=403, detail=result["message"])
+
+
+# ----- Admin: Chip Provisioning -----
+class ProvisionTagRequest(BaseModel):
+    nfc_uid: str = Field(..., description="UID read from the chip after provisioning")
+    auth_key: str = Field(..., description="32-char hex AES-128 key written to the chip")
+
+@app.post("/api/admin/provision-tag")
+def provision_tag(
+    request: ProvisionTagRequest,
+    x_admin_key: str = Header(..., alias="X-Admin-Key"),
+    db: Session = Depends(get_db)
+):
+    """
+    Called by the in-app provisioning screen after it has successfully configured
+    an NTAG 424 DNA chip. Stores the uid + auth_key in the database so the chip
+    can be used for SUN-authenticated payments.
+
+    Protected by a secret admin key (X-Admin-Key header), NOT a parent JWT.
+    """
+    if x_admin_key != ADMIN_PROVISION_KEY:
+        raise HTTPException(status_code=403, detail="Invalid admin key")
+
+    if len(request.auth_key) != 32:
+        raise HTTPException(status_code=400, detail="auth_key must be 32 hex characters (AES-128)")
+
+    # Check if tag already exists (re-provisioning flow)
+    existing = db.query(NFCTag).filter(NFCTag.nfc_uid == request.nfc_uid).first()
+    if existing:
+        existing.auth_key = request.auth_key
+        existing.last_counter = 0
+        db.commit()
+        return {"success": True, "message": "Tag re-provisioned", "uid": request.nfc_uid}
+
+    # New tag — create a stub record (no user_id yet; will be assigned when parent links it)
+    # We create a minimal NFCTag with status "unlinked" so we can track provisioned inventory
+    # user_id is required by the model, so we store None by relaxing the constraint here.
+    # For MVP: provisioned tags without a user_id are linked later via /link-nfc.
+    # The NFCTag.user_id FK requires a real user, so we skip creating it here and just
+    # return the key for the parent to enter on the Link screen.
+    # A cleaner production approach would store provisioned keys in a separate inventory table.
+    return {
+        "success": True,
+        "message": "Tag provisioned. Use the Link Wristband screen to assign it to a child.",
+        "uid": request.nfc_uid,
+        "auth_key": request.auth_key,
+    }

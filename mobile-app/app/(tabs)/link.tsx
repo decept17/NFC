@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, Dimensions, FlatList, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StyleSheet, Dimensions, FlatList, TouchableOpacity, Alert, TextInput } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -47,7 +47,14 @@ export default function LinkScreen() {
     }
   };
 
+  const [authKey, setAuthKey] = useState('');
+
   const handleStartConnection = async () => {
+    if (!authKey || authKey.length !== 32) {
+      Alert.alert('Missing Key', 'Please enter the 32-character AES auth key printed on the provisioning sheet for this wristband.');
+      return;
+    }
+
     setIsConnecting(true);
 
     try {
@@ -66,31 +73,50 @@ export default function LinkScreen() {
       // 2. Request Android NFC scanning dialog / iOS sheet
       await NfcManager.requestTechnology(NfcTech.Ndef);
 
-      // 3. Read the tag ID from the hardware
+      // 3. Read the NDEF message from the tag.
+      //    NTAG 424 DNA writes a SUN URL like:
+      //    https://api.n3xo.com/pay?uid=04AABBCCDDEE&c=000015&m=8A9BCD1234567890
       const tag = await NfcManager.getTag();
 
-      if (!tag || !tag.id) {
-        throw new Error('new tag collected - Empty tag');
+      if (!tag?.ndefMessage || tag.ndefMessage.length === 0) {
+        throw new Error('No NDEF message found on this tag. Is it a provisioned NTAG 424 DNA?');
       }
 
-      // tag.id from react-native-nfc-manager is a byte array like [4, 123, 45, ...]
-      // We must convert it to a hex string for the backend (e.g. "047B2D...")
-      const rawId = tag.id;
-      const nfcUid: string = Array.isArray(rawId)
-        ? (rawId as number[]).map(b => b.toString(16).padStart(2, '0')).join('').toUpperCase()
-        : String(rawId);
+      // URI record payload: first byte is the URI identifier code (0x04 = "https://") — skip it
+      const ndefRecord = tag.ndefMessage[0];
+      const payloadBytes: number[] = ndefRecord.payload as number[];
+      const urlString = payloadBytes.slice(1)
+        .map((b: number) => String.fromCharCode(b))
+        .join('');
 
-      console.log('[NFC] Tag scanned. Raw id:', JSON.stringify(rawId), '-> UID string:', nfcUid);
+      console.log('[NFC] NDEF URL:', urlString);
 
-      // 4. Send the real hardware UID to the backend
+      // 4. Parse the SUN query parameters out of the URL
+      let parsedUrl: URL;
+      try {
+        parsedUrl = new URL(urlString.startsWith('http') ? urlString : `https://${urlString}`);
+      } catch {
+        throw new Error(`Could not parse NDEF URL: "${urlString}"`);
+      }
+
+      const uid     = parsedUrl.searchParams.get('uid');
+      const counter = parsedUrl.searchParams.get('c');
+      const cmac    = parsedUrl.searchParams.get('m');
+
+      if (!uid || !counter || !cmac) {
+        throw new Error(`SUN URL is missing parameters. Got: uid=${uid}, c=${counter}, m=${cmac}`);
+      }
+
+      console.log('[NFC] SUN params — uid:', uid, 'counter:', counter, 'cmac:', cmac);
+
+      // 5. Send UID + auth_key to the backend to register the wristband
       const response = await fetchApi(`/accounts/${selectedAccount?.id}/link-nfc`, {
         method: 'POST',
-        body: JSON.stringify({ nfc_uid: nfcUid })
+        body: JSON.stringify({ nfc_uid: uid, auth_key: authKey })
       });
 
       if (!response.ok) {
-        // Safely parse the error – the server might return HTML on unexpected crashes
-        let errorDetail = "Linking failed on backend.";
+        let errorDetail = 'Linking failed on backend.';
         try {
           const errorData = await response.json();
           errorDetail = errorData.detail || errorDetail;
@@ -101,14 +127,14 @@ export default function LinkScreen() {
       }
 
       Alert.alert(
-        "Success!",
+        'Success!',
         `${selectedAccount?.name}'s NFC Band linked successfully.`,
-        [{ text: "OK", onPress: () => router.push('/(tabs)/home') }]
+        [{ text: 'OK', onPress: () => router.push('/(tabs)/home') }]
       );
     } catch (error: any) {
-      Alert.alert("Error", error.message || "Something went wrong.");
+      Alert.alert('Error', error.message || 'Something went wrong.');
     } finally {
-      // 5. Very important: Turn off the NFC scanner when done or failed
+      // 6. Very important: Turn off the NFC scanner when done or failed
       NfcManager.cancelTechnologyRequest();
       setIsConnecting(false);
     }
@@ -165,6 +191,17 @@ export default function LinkScreen() {
           </View>
 
           <View style={styles.buttonContainer}>
+            {/* Auth Key Input */}
+            <TextInput
+              style={styles.authKeyInput}
+              placeholder="AES Auth Key (32 hex chars)"
+              placeholderTextColor="rgba(255,255,255,0.6)"
+              value={authKey}
+              onChangeText={setAuthKey}
+              autoCapitalize="none"
+              autoCorrect={false}
+              maxLength={32}
+            />
             {/* DYNAMIC BUTTON TEXT */}
             <PillButton
               title={`Connect ${selectedAccount?.name}`}
@@ -286,5 +323,18 @@ const styles = StyleSheet.create({
   translucentButtonPeach: {
     backgroundColor: 'rgba(255, 255, 255, 0.3)',
     elevation: 0,
+  },
+  authKeyInput: {
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    color: '#fff',
+    fontSize: 14,
+    fontFamily: 'monospace',
+    width: '80%',
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.4)',
   }
 });

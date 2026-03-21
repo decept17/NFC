@@ -14,9 +14,10 @@ const SettingsRow = ({ title, isLast = false, onPress }: { title: string, isLast
   </TouchableOpacity>
 );
 
+
 export default function SettingsScreen() {
   const router = useRouter();
-  const { selectedAccount } = useFamily(); // To show whose settings these are if needed later
+  const { selectedAccount } = useFamily();
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -77,7 +78,12 @@ export default function SettingsScreen() {
             onPress={() => console.log('Contact pressed')} 
           />
         </View>
+
+
+
       </ScrollView>
+
+
     </SafeAreaView>
   );
 }
@@ -132,7 +138,7 @@ const styles = StyleSheet.create({
   },
   divider: {
     height: 1,
-    backgroundColor: '#000', // Solid black line matching the mockup
+    backgroundColor: '#000',
     marginTop: 15,
-  }
+  },
 });

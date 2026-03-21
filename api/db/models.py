@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Numeric, ForeignKey, DateTime, JSON, Boolean
+from sqlalchemy import Column, String, Numeric, ForeignKey, DateTime, JSON, Boolean, Integer
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
@@ -17,6 +17,9 @@ class NFCTag(Base):
     # Use String to match the native 'tag_status' enum already created in init.sql
     status = Column(String, default='active')
     label = Column(String, nullable=True) # e.g., "Blue Wristband"
+    # SUN (Secure Unique NFC) fields for NTAG 424 DNA
+    auth_key = Column(String, nullable=True)   # AES-128 key as hex string (provisioned into chip)
+    last_counter = Column(Integer, nullable=False, default=0)  # Tap counter — rejects replays
     created_at = Column(DateTime, default=datetime.now)
     last_used_at = Column(DateTime, nullable=True)
 

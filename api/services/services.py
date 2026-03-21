@@ -174,16 +174,6 @@ class PaymentService:
                 stripe_transfer_id=transfer.id # Save proof of payment
             )
             db.add(success_tx)
-
-            new_txn = Transaction(
-                account_id=account.account_id,
-                merchant_id=merchant_id,
-                amount=-amount,  # Negative for spending
-                description=f"Purchase at {merchant_id}", # Or fetch merchant name
-                category=category)
-            
-            db.add(new_txn)
-
             db.commit()
             return {"success": True, "new_balance": float(account.balance)}
 

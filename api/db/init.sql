@@ -119,6 +119,13 @@ CREATE TABLE nfc_tags (
     user_id UUID NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
     status tag_status DEFAULT 'active',
     label VARCHAR,
+    -- NTAG 424 DNA SUN (Secure Unique NFC) fields
+    auth_key VARCHAR,                          -- AES-128 key as hex (provisioned into chip, secret)
+    last_counter INTEGER NOT NULL DEFAULT 0,   -- Monotonic tap counter; rejects replayed taps
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     last_used_at TIMESTAMP
 );
+
+-- Migration helper: run this if upgrading an existing database
+-- ALTER TABLE nfc_tags ADD COLUMN IF NOT EXISTS auth_key VARCHAR;
+-- ALTER TABLE nfc_tags ADD COLUMN IF NOT EXISTS last_counter INTEGER NOT NULL DEFAULT 0;
