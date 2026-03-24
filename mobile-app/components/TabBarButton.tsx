@@ -17,6 +17,8 @@ const icons: Record<string, (props: any) => JSX.Element> = {
   topup: (props: any) => <Ionicons name="add-circle" size={24} {...props} />,
   link: (props: any) => <Ionicons name="hardware-chip-outline" size={24} {...props} />,
   history: (props: any) => <Ionicons name="time" size={24} {...props} />,
+  'child-home': (props: any) => <Ionicons name="home" size={24} {...props} />,
+  'child-history': (props: any) => <Ionicons name="time" size={24} {...props} />,
 };
 
 export const TabBarButton = (props: TabBarButtonProps) => {

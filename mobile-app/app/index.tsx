@@ -1,35 +1,62 @@
-import { Text, View, StyleSheet } from "react-native";
+import { Text, View, StyleSheet, TouchableOpacity } from "react-native";
 import { useRouter } from "expo-router";
 import { Colors } from "@/constants/Colours";
 import { PillButton } from "@/components/PillButton";
 import { SafeAreaView } from "react-native-safe-area-context";
+import React, { useState } from "react";
 
 export default function WelcomeScreen() {
   const router = useRouter();
+  const [mode, setMode] = useState<'parent' | 'child'>('parent');
 
   return (
-    // SafeAreaView ensures content isnt hidden behind the notch
     <SafeAreaView style={styles.container}>
       {/* The Logo section */}
-     <View style={styles.logoContainer}>
-      <Text style={styles.logoText}>N3XO</Text>
-      </View> 
+      <View style={styles.logoContainer}>
+        <Text style={styles.logoText}>N3XO</Text>
+      </View>
 
-      {/* The Buttons Section*/}
+      {/* Toggle: Parent / Child */}
+      <View style={styles.toggleContainer}>
+        <TouchableOpacity
+          style={[styles.toggleOption, mode === 'parent' && styles.toggleActive]}
+          onPress={() => setMode('parent')}
+          activeOpacity={0.8}
+        >
+          <Text style={[styles.toggleText, mode === 'parent' && styles.toggleTextActive]}>
+            Parent
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.toggleOption, mode === 'child' && styles.toggleActive]}
+          onPress={() => setMode('child')}
+          activeOpacity={0.8}
+        >
+          <Text style={[styles.toggleText, mode === 'child' && styles.toggleTextActive]}>
+            Child
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* The Buttons Section */}
       <View style={styles.buttonContainer}>
-        <PillButton title="Login" onPress={() => router.push('/login')}/>
-        <PillButton title="Register" onPress={() => router.push('/register')}/>
+        <PillButton
+          title="Login"
+          onPress={() => router.push({ pathname: '/login', params: { mode } })}
+        />
+        {mode === 'parent' && (
+          <PillButton title="Register" onPress={() => router.push('/register')} />
+        )}
       </View>
     </SafeAreaView>
   );
 }
 
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: Colors.backgroundBlue,
-    justifyContent: 'space-between', // Pushes logo up and buttons down
+    justifyContent: 'space-between',
     paddingVertical: 50,
   },
   logoContainer: {
@@ -44,8 +71,33 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 5, height: 5 },
     textShadowRadius: 10,
   },
+  toggleContainer: {
+    flexDirection: 'row',
+    alignSelf: 'center',
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    borderRadius: 30,
+    padding: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.3)',
+  },
+  toggleOption: {
+    paddingVertical: 12,
+    paddingHorizontal: 32,
+    borderRadius: 26,
+  },
+  toggleActive: {
+    backgroundColor: Colors.buttonDark,
+  },
+  toggleText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.6)',
+  },
+  toggleTextActive: {
+    color: Colors.textWhite,
+  },
   buttonContainer: {
     alignItems: 'center',
     marginBottom: 50,
-  }
+  },
 });

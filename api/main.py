@@ -4,7 +4,7 @@ from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from db.database import get_db
 from services.services import PaymentService
-from db.models import Account, Merchant, User, Transaction, NFCTag
+from db.models import Account, Merchant, User, Transaction, NFCTag, Notification
 from typing import List
 from pydantic import BaseModel, Field
 from uuid import UUID
@@ -95,9 +95,11 @@ def freeze_account(
     if not account:
         raise HTTPException(status_code=404, detail="Account not found")
 
-    # Verify Parent
+    # Verify: Parent of the child, OR the child themselves
     child = db.query(User).filter(User.user_id == account.owner_id).first()
-    if child.parent_id != current_user.user_id:
+    is_parent = child and child.parent_id == current_user.user_id
+    is_self = account.owner_id == current_user.user_id
+    if not is_parent and not is_self:
         raise HTTPException(status_code=403, detail="Not authorized")
 
     # Toggle Status if active go to frozen otherwise vice versa
@@ -121,14 +123,16 @@ def get_history(
     if not account:
         raise HTTPException(status_code=404, detail="Account not found")
 
-    # Verify Parent
+    # Verify: Parent of the child, OR the child themselves
     child = db.query(User).filter(User.user_id == account.owner_id).first()
-    if child.parent_id != current_user.user_id:
+    is_parent = child and child.parent_id == current_user.user_id
+    is_self = account.owner_id == current_user.user_id
+    if not is_parent and not is_self:
         raise HTTPException(status_code=403, detail="Not authorized")
     
     transactions = db.query(Transaction)\
         .filter(Transaction.account_id == account_id)\
-        .order_by(Transaction.timestamp.desc())\
+        .order_by(Transaction.created_at.desc())\
         .limit(20)\
         .all()
         
@@ -138,13 +142,19 @@ def get_history(
 @app.post("/api/auth/login")
 def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
     """
-    Exchanges Email/Password for a JWT token
-    Front-end sends: username (email) & password
+    Exchanges credentials for a JWT token.
+    Parents log in with email, children log in with username.
+    The 'username' field of the OAuth2 form carries either the email or the child username.
     """
-    # find the user email
-    user = db.query(User).filter(User.email == form_data.username).first()
+    identifier = form_data.username  # could be email or child username
 
-    # User not found -> Tell the app to show "Do you want to register?"
+    # Try to find by email first (parent flow)
+    user = db.query(User).filter(User.email == identifier).first()
+
+    # If not found by email, try by username (child flow)
+    if not user:
+        user = db.query(User).filter(User.username == identifier).first()
+
     if not user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -152,17 +162,20 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    # User found but pass is wrong -> Tell app "Wrong password"
     if not verify_password(form_data.password, user.password_hash):
         raise HTTPException(
-            status_code= status.HTTP_401_UNAUTHORIZED,
+            status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect password",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    
-    # Generate Token
+
     access_token = create_access_token(data={"sub": str(user.user_id)})
-    return {"access_token": access_token, "token_type": "bearer"}
+    return {
+        "access_token": access_token,
+        "token_type": "bearer",
+        "role": user.role,
+        "user_id": str(user.user_id),
+    }
 
 class RegisterRequest(BaseModel):
     email: str
@@ -201,6 +214,8 @@ def register(request: RegisterRequest, db: Session = Depends(get_db)):
 
 class AddChildRequest(BaseModel):
     name: str
+    username: str
+    password: str
 
 @app.post("/api/accounts/add-child")
 def add_child(
@@ -209,20 +224,27 @@ def add_child(
     db: Session = Depends(get_db)
 ):
     """
-    Creates a child user and their wallet account, linked to the logged-in parent.
+    Creates a child user (with login credentials) and their wallet account,
+    linked to the logged-in parent.
     """
     if current_user.role != "parent":
         raise HTTPException(status_code=403, detail="Only parents can add children")
 
-    # Create the child User
+    # Check if username is already taken
+    existing = db.query(User).filter(User.username == request.username).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="Username already taken")
+
+    # Create the child User with login credentials
     child = User(
         role="child",
         name=request.name,
+        username=request.username,
+        password_hash=get_password_hash(request.password),
         parent_id=current_user.user_id,
-        # Children don't have email/password - they use NFC wristbands
     )
     db.add(child)
-    db.flush()  # Get the child's user_id without committing
+    db.flush()
 
     # Create a wallet Account for the child
     child_account = Account(
@@ -536,3 +558,90 @@ def provision_tag(
         "uid": request.nfc_uid,
         "auth_key": request.auth_key,
     }
+
+
+# ----- Child-Specific Routes -----
+
+@app.get("/api/child/my-account")
+def get_child_account(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Returns the logged-in child's own account details (balance, status, name).
+    """
+    if current_user.role != "child":
+        raise HTTPException(status_code=403, detail="This endpoint is for child accounts only")
+
+    account = db.query(Account).filter(Account.owner_id == current_user.user_id).first()
+    if not account:
+        raise HTTPException(status_code=404, detail="No account found for this child")
+
+    return {
+        "child_name": current_user.name or "Child",
+        "balance": float(account.balance),
+        "account_id": str(account.account_id),
+        "status": account.status,
+    }
+
+
+# ----- Notification Routes -----
+
+class PingRequest(BaseModel):
+    message: str = "Can I have some money?"
+
+@app.post("/api/notifications/ping")
+def ping_parent(
+    request: PingRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Child sends a 'ping for money' notification to their parent.
+    """
+    if current_user.role != "child":
+        raise HTTPException(status_code=403, detail="Only children can ping their parent")
+
+    if not current_user.parent_id:
+        raise HTTPException(status_code=400, detail="No linked parent found")
+
+    notification = Notification(
+        child_id=current_user.user_id,
+        parent_id=current_user.parent_id,
+        message=request.message,
+    )
+    db.add(notification)
+    db.commit()
+
+    return {"success": True, "message": "Your parent has been notified!"}
+
+
+@app.get("/api/notifications")
+def get_notifications(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Parent fetches their unread notifications from children.
+    """
+    if current_user.role != "parent":
+        raise HTTPException(status_code=403, detail="Only parents can view notifications")
+
+    notifications = db.query(Notification)\
+        .filter(Notification.parent_id == current_user.user_id)\
+        .order_by(Notification.created_at.desc())\
+        .limit(50)\
+        .all()
+
+    result = []
+    for n in notifications:
+        child = db.query(User).filter(User.user_id == n.child_id).first()
+        result.append({
+            "notification_id": str(n.notification_id),
+            "child_name": child.name if child else "Child",
+            "message": n.message,
+            "status": n.status,
+            "created_at": n.created_at.isoformat() if n.created_at else None,
+        })
+
+    return result

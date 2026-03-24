@@ -13,8 +13,10 @@ CREATE TABLE users (
     role TEXT NOT NULL CHECK (role IN ('parent', 'child')),
     email TEXT UNIQUE,
     -- Parent email used for login (NULL for children)
+    username TEXT UNIQUE,
+    -- Child username used for login (NULL for parents)
     password_hash TEXT,
-    -- Hashed password for parent login
+    -- Hashed password for login (parent uses email+password, child uses username+password)
     -- Child linking data (only relevant if role = 'child')
     parent_id UUID REFERENCES users(user_id) ON DELETE CASCADE,
     name TEXT,
@@ -129,3 +131,18 @@ CREATE TABLE nfc_tags (
 -- Migration helper: run this if upgrading an existing database
 -- ALTER TABLE nfc_tags ADD COLUMN IF NOT EXISTS auth_key VARCHAR;
 -- ALTER TABLE nfc_tags ADD COLUMN IF NOT EXISTS last_counter INTEGER NOT NULL DEFAULT 0;
+-- ALTER TABLE users ADD COLUMN IF NOT EXISTS username TEXT UNIQUE;
+
+----------------------------------------------------
+-- 6. NOTIFICATIONS TABLE (Child-to-Parent Requests)
+----------------------------------------------------
+-- Stores "ping for money" requests from children to parents.
+CREATE TABLE notifications (
+    notification_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    child_id UUID NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+    parent_id UUID NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+    message TEXT NOT NULL DEFAULT 'Can I have some money?',
+    status TEXT NOT NULL DEFAULT 'unread' CHECK (status IN ('unread', 'read', 'dismissed')),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+CREATE INDEX idx_notifications_parent ON notifications(parent_id);

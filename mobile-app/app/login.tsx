@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { View, Text, StyleSheet, KeyboardAvoidingView, Platform, TouchableWithoutFeedback, Keyboard, TouchableOpacity, Alert } from "react-native";
-import { useRouter } from "expo-router";
+import { useRouter, useLocalSearchParams } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Colors } from "@/constants/Colours";
 import { PillButton } from "@/components/PillButton";
@@ -11,14 +11,17 @@ import { fetchApi } from "@/services/api";
 
 export default function LoginScreen() {
   const router = useRouter();
+  const { mode } = useLocalSearchParams<{ mode?: string }>();
+  const isChildMode = mode === 'child';
+
   const { login } = useAuth();
-  const [email, setEmail] = useState<string>('');
+  const [identifier, setIdentifier] = useState<string>('');
   const [password, setPassword] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(false);
 
   const handleLogin = async () => {
-    if (!email || !password) {
-      alert("Please enter both email and password.");
+    if (!identifier || !password) {
+      alert(`Please enter both ${isChildMode ? 'username' : 'email'} and password.`);
       return;
     }
 
@@ -26,7 +29,7 @@ export default function LoginScreen() {
     try {
       // OAuth2 expects form-encoded data
       const body = new URLSearchParams();
-      body.append('username', email);
+      body.append('username', identifier); // Backend tries email first, then username
       body.append('password', password);
 
       const response = await fetchApi('/auth/login', {
@@ -41,11 +44,15 @@ export default function LoginScreen() {
         if (response.status === 404) {
           Alert.alert(
             "Account Not Found",
-            "We couldn't find an account with that email. Would you like to register?",
-            [
-              { text: "Cancel", style: "cancel" },
-              { text: "Register", onPress: () => router.push('/register') }
-            ]
+            isChildMode
+              ? "We couldn't find an account with that username. Ask your parent to create your account."
+              : "We couldn't find an account with that email. Would you like to register?",
+            isChildMode
+              ? [{ text: "OK" }]
+              : [
+                  { text: "Cancel", style: "cancel" },
+                  { text: "Register", onPress: () => router.push('/register') }
+                ]
           );
           setLoading(false);
           return;
@@ -55,12 +62,16 @@ export default function LoginScreen() {
       }
 
       const data = await response.json();
+      const role = data.role || (isChildMode ? 'child' : 'parent');
 
-      // Assuming backend doesn't return full user details yet, we mock the role here 
-      // but we store the real token
-      await login(data.access_token, { id: "unknown", role: "parent" });
+      await login(data.access_token, { id: data.user_id || "unknown", role });
 
-      router.replace('/(tabs)/home');
+      // Route based on role
+      if (role === 'child') {
+        router.replace('/(child-tabs)/child-home' as any);
+      } else {
+        router.replace('/(tabs)/home');
+      }
     } catch (error: any) {
       alert(error.message || "An error occurred during login.");
     } finally {
@@ -75,12 +86,15 @@ export default function LoginScreen() {
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={styles.inner}>
           <Text style={styles.logoText}>N3XO</Text>
+          <Text style={styles.modeLabel}>
+            {isChildMode ? '👦 Child Login' : '👨‍👩‍👧 Parent Login'}
+          </Text>
           <View style={styles.form}>
             <PillInput
-              placeholder="email"
-              value={email}
-              onChangeText={setEmail}
-              keyboardType="email-address" />
+              placeholder={isChildMode ? 'username' : 'email'}
+              value={identifier}
+              onChangeText={setIdentifier}
+              keyboardType={isChildMode ? 'default' : 'email-address'} />
             <PillInput
               placeholder="password"
               secureTextEntry
@@ -92,11 +106,13 @@ export default function LoginScreen() {
                 title="Login"
                 onPress={handleLogin}
                 isLoading={loading} />
-              <TouchableOpacity
-                onPress={() => router.push('/register')}
-                style={styles.switchTextContainer}>
-                <Text style={styles.switchText}>Need to register?</Text>
-              </TouchableOpacity>
+              {!isChildMode && (
+                <TouchableOpacity
+                  onPress={() => router.push('/register')}
+                  style={styles.switchTextContainer}>
+                  <Text style={styles.switchText}>Need to register?</Text>
+                </TouchableOpacity>
+              )}
             </View>
           </View>
         </KeyboardAvoidingView>
@@ -113,17 +129,24 @@ const styles = StyleSheet.create({
   },
   inner: {
     flex: 1,
-    justifyContent: 'flex-start', // ALIGNMENT CHANGE
+    justifyContent: 'flex-start',
     alignItems: 'center',
   },
   logoText: {
-    marginTop: 80, // ALIGNMENT CHANGE
+    marginTop: 80,
     fontSize: 90,
     fontWeight: 'medium',
     color: Colors.textOrange,
     textShadowColor: 'rgba(0, 0, 0, 0.2)',
     textShadowOffset: { width: 5, height: 5 },
     textShadowRadius: 10,
+  },
+  modeLabel: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: Colors.textWhite,
+    marginTop: 10,
+    opacity: 0.85,
   },
   form: {
     width: '100%',
@@ -137,11 +160,11 @@ const styles = StyleSheet.create({
     alignItems: 'center'
   },
   switchTextContainer: {
-    marginTop: 30, // Adds space between the PillButton and the text
-    padding: 10,   // Makes the clickable area slightly larger for fat fingers
+    marginTop: 30,
+    padding: 10,
   },
   switchText: {
-    color: Colors.textWhite, // Uses your white constant
+    color: Colors.textWhite,
     fontSize: 14,
     fontWeight: 'thin',
     textDecorationLine: 'underline',

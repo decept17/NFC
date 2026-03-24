@@ -23,6 +23,8 @@ export default function AddChildScreen() {
     const router = useRouter();
     const { refreshAccounts } = useFamily();
     const [name, setName] = useState<string>("");
+    const [username, setUsername] = useState<string>("");
+    const [childPassword, setChildPassword] = useState<string>("");
     const [loading, setLoading] = useState<boolean>(false);
 
     const handleAddChild = async () => {
@@ -30,12 +32,24 @@ export default function AddChildScreen() {
             Alert.alert("Missing Name", "Please enter your child's name.");
             return;
         }
+        if (!username.trim()) {
+            Alert.alert("Missing Username", "Please create a username for your child.");
+            return;
+        }
+        if (!childPassword.trim() || childPassword.length < 4) {
+            Alert.alert("Missing Password", "Please create a password (at least 4 characters) for your child.");
+            return;
+        }
 
         setLoading(true);
         try {
             const response = await fetchApi("/accounts/add-child", {
                 method: "POST",
-                body: JSON.stringify({ name: name.trim() }),
+                body: JSON.stringify({
+                    name: name.trim(),
+                    username: username.trim(),
+                    password: childPassword,
+                }),
             });
 
             // Read raw text first so we never crash on malformed responses
@@ -96,14 +110,27 @@ export default function AddChildScreen() {
                         </View>
 
                         <Text style={styles.subtitle}>
-                            Enter your child's name to create their account. They'll be given a digital
-                            wallet and can be linked to an NFC wristband.
+                            Enter your child's details to create their account. They'll use the
+                            username and password to log in on their own device.
                         </Text>
 
                         <PillInput
                             placeholder="Child's name (e.g. Oliver)"
                             value={name}
                             onChangeText={setName}
+                        />
+
+                        <PillInput
+                            placeholder="Create a username"
+                            value={username}
+                            onChangeText={setUsername}
+                        />
+
+                        <PillInput
+                            placeholder="Create a password"
+                            secureTextEntry
+                            value={childPassword}
+                            onChangeText={setChildPassword}
                         />
 
                         <View style={styles.buttonWrapper}>

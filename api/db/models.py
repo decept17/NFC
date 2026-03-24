@@ -93,6 +93,7 @@ class User(Base):
     name = Column(String, nullable=True)  # Used for child display names
     #Nullable because children dont have them
     email = Column(String, unique=True, nullable=True)
+    username = Column(String, unique=True, nullable=True)  # Used for child login
     password_hash = Column(String, nullable=True)
     parent_id = Column(UUID(as_uuid=True), ForeignKey("users.user_id"), nullable=True) # parent doesnt need id
     is_active = Column(Boolean, default=True)
@@ -101,3 +102,12 @@ class User(Base):
 
     # Link to the financial accounts 
     accounts = relationship("Account", foreign_keys="Account.owner_id", back_populates="user")
+
+class Notification(Base):
+    __tablename__ = "notifications"
+    notification_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    child_id = Column(UUID(as_uuid=True), ForeignKey("users.user_id"), nullable=False)
+    parent_id = Column(UUID(as_uuid=True), ForeignKey("users.user_id"), nullable=False)
+    message = Column(String, nullable=False, default="Can I have some money?")
+    status = Column(String, nullable=False, default="unread")  # unread, read, dismissed
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
