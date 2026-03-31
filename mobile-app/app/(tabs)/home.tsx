@@ -14,6 +14,7 @@ export default function HomeScreen() {
   // 1. Hook into the Global Context instead of local state!
   const { accounts, setAccounts, selectedAccountId, setSelectedAccountId, selectedAccount, refreshAccounts } = useFamily();
   const navigation = useNavigation();
+  const [unreadCount, setUnreadCount] = useState(0);
 
   React.useEffect(() => {
     const unsubscribe = (navigation as any).addListener('tabPress', (e: any) => {
@@ -27,6 +28,18 @@ export default function HomeScreen() {
   useFocusEffect(
     useCallback(() => {
       refreshAccounts();
+      // Fetch unread notification count
+      const fetchNotifCount = async () => {
+        try {
+          const response = await fetchApi('/notifications');
+          if (response.ok) {
+            const data = await response.json();
+            const active = data.filter((n: any) => n.status !== 'dismissed');
+            setUnreadCount(active.length);
+          }
+        } catch (e) { /* silent */ }
+      };
+      fetchNotifCount();
     }, [])
   );
 
@@ -123,8 +136,13 @@ export default function HomeScreen() {
 
       {/* HEADER */}
       <View style={styles.header}>
-        <TouchableOpacity>
-          <Ionicons name="person-outline" size={28} color={Colors.buttonDark} />
+        <TouchableOpacity onPress={() => router.push('/notifications')} style={styles.bellContainer}>
+          <Ionicons name="notifications-outline" size={28} color={Colors.buttonDark} />
+          {unreadCount > 0 && (
+            <View style={styles.badge}>
+              <Text style={styles.badgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
+            </View>
+          )}
         </TouchableOpacity>
 
         <Text style={styles.headerLogo}>N3XO</Text>
@@ -336,5 +354,27 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#222',
     fontWeight: '500',
-  }
+  },
+
+  // Notification bell
+  bellContainer: {
+    position: 'relative',
+  },
+  badge: {
+    position: 'absolute',
+    top: -4,
+    right: -6,
+    backgroundColor: '#E53935',
+    borderRadius: 10,
+    minWidth: 18,
+    height: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 4,
+  },
+  badgeText: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: '700',
+  },
 });

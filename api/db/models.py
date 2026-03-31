@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Numeric, ForeignKey, DateTime, JSON, Boolean, Integer
+from sqlalchemy import Column, String, Numeric, ForeignKey, DateTime, JSON, Boolean, Integer, ARRAY
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
@@ -73,10 +73,11 @@ class Transaction(Base):
 
 class Limit(Base):
     __tablename__ = "limits"
-    child_account_id = Column(UUID(as_uuid=True), ForeignKey("accounts.account_id"), primary_key=True)
+    limit_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    child_account_id = Column(UUID(as_uuid=True), ForeignKey("accounts.account_id"), unique=True)
     daily_spending_limit = Column(Numeric(12,2), default=0.00)
     single_transaction_max = Column(Numeric(12,2), default=0.00)
-    blocked_categories = Column(JSON) # List of strings
+    blocked_categories = Column(ARRAY(String))  # TEXT[] in PostgreSQL
 
 class Merchant(Base):
     __tablename__ = "merchants"

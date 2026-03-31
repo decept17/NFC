@@ -1,10 +1,11 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Switch, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { Colors } from '@/constants/Colours';
 import { useFamily } from '@/context/FamilyContext';
+import { useAuth } from '@/context/AuthContext';
 
 // Helper component for individual rows
 const SettingsRow = ({ title, isLast = false, onPress }: { title: string, isLast?: boolean, onPress: () => void }) => (
@@ -14,10 +15,49 @@ const SettingsRow = ({ title, isLast = false, onPress }: { title: string, isLast
   </TouchableOpacity>
 );
 
+// Toggle row with a switch
+const SettingsToggleRow = ({ title, value, onToggle, isLast = false }: {
+  title: string, value: boolean, onToggle: (val: boolean) => void, isLast?: boolean
+}) => (
+  <View style={styles.rowItem}>
+    <View style={styles.toggleRow}>
+      <Text style={styles.rowText}>{title}</Text>
+      <Switch
+        value={value}
+        onValueChange={onToggle}
+        trackColor={{ false: '#ccc', true: Colors.backgroundBlue }}
+        thumbColor="#fff"
+      />
+    </View>
+    {!isLast && <View style={styles.divider} />}
+  </View>
+);
+
 
 export default function SettingsScreen() {
   const router = useRouter();
   const { selectedAccount } = useFamily();
+  const { biometricsAvailable, biometricsEnabled, enableBiometrics, disableBiometrics, logout } = useAuth();
+
+  const handleBiometricToggle = async (value: boolean) => {
+    if (value) {
+      await enableBiometrics();
+    } else {
+      await disableBiometrics();
+    }
+  };
+
+  const handleLogout = () => {
+    Alert.alert('Log Out', 'Are you sure you want to log out?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Log Out', style: 'destructive', onPress: async () => {
+          await logout();
+          router.replace('/');
+        }
+      },
+    ]);
+  };
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -44,11 +84,11 @@ export default function SettingsScreen() {
         <View style={styles.cardGroup}>
           <SettingsRow 
             title="Blocked categories" 
-            onPress={() => console.log('Blocked categories pressed')} 
+            onPress={() => router.push('/limits')} 
           />
           <SettingsRow 
             title="Limits" 
-            onPress={() => console.log('Limits pressed')} 
+            onPress={() => router.push('/limits')} 
           />
           <SettingsRow 
             title="Recurring payments" 
@@ -57,11 +97,18 @@ export default function SettingsScreen() {
           />
         </View>
 
-        {/* GROUP 2: App Preferences */}
+        {/* GROUP 2: Security */}
         <View style={styles.cardGroup}>
+          {biometricsAvailable && (
+            <SettingsToggleRow
+              title="Biometric Login"
+              value={biometricsEnabled}
+              onToggle={handleBiometricToggle}
+            />
+          )}
           <SettingsRow 
             title="Notifications" 
-            onPress={() => console.log('Notifications pressed')} 
+            onPress={() => router.push('/notifications')} 
           />
           <SettingsRow 
             title="Leave a review" 
@@ -79,7 +126,11 @@ export default function SettingsScreen() {
           />
         </View>
 
-
+        {/* LOG OUT */}
+        <TouchableOpacity style={styles.logoutButton} onPress={handleLogout} activeOpacity={0.8}>
+          <Ionicons name="log-out-outline" size={20} color="#E53935" />
+          <Text style={styles.logoutText}>Log Out</Text>
+        </TouchableOpacity>
 
       </ScrollView>
 
@@ -122,7 +173,7 @@ const styles = StyleSheet.create({
   
   // Settings Card Styles
   cardGroup: {
-    backgroundColor: 'rgba(255, 255, 255, 0.3)', // Semi-transparent overlay to match your drawing
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
     borderRadius: 20,
     marginBottom: 25,
     paddingVertical: 5,
@@ -136,9 +187,30 @@ const styles = StyleSheet.create({
     color: '#000',
     fontWeight: '500',
   },
+  toggleRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
   divider: {
     height: 1,
     backgroundColor: '#000',
     marginTop: 15,
+  },
+
+  // Logout button
+  logoutButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 16,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+  },
+  logoutText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#E53935',
   },
 });

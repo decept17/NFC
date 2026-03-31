@@ -1,10 +1,11 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { View, Text, StyleSheet, KeyboardAvoidingView, Platform, TouchableWithoutFeedback, Keyboard, TouchableOpacity, Alert } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Colors } from "@/constants/Colours";
 import { PillButton } from "@/components/PillButton";
 import { PillInput } from "@/components/PillInput";
+import { Ionicons } from '@expo/vector-icons';
 
 import { useAuth } from "@/context/AuthContext";
 import { fetchApi } from "@/services/api";
@@ -14,10 +15,38 @@ export default function LoginScreen() {
   const { mode } = useLocalSearchParams<{ mode?: string }>();
   const isChildMode = mode === 'child';
 
-  const { login } = useAuth();
+  const { login, biometricsAvailable, biometricsEnabled, authenticateWithBiometrics } = useAuth();
   const [identifier, setIdentifier] = useState<string>('');
   const [password, setPassword] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(false);
+
+  // Auto-prompt biometrics on screen load if enabled
+  useEffect(() => {
+    if (biometricsEnabled && biometricsAvailable) {
+      handleBiometricLogin();
+    }
+  }, [biometricsEnabled, biometricsAvailable]);
+
+  const handleBiometricLogin = async () => {
+    setLoading(true);
+    try {
+      const success = await authenticateWithBiometrics();
+      if (success) {
+        // The AuthContext already restored the user — just navigate
+        const userData = await import('expo-secure-store').then(s => s.getItemAsync('userData'));
+        const role = userData ? JSON.parse(userData).role : 'parent';
+        if (role === 'child') {
+          router.replace('/(child-tabs)/child-home' as any);
+        } else {
+          router.replace('/(tabs)/home');
+        }
+      }
+    } catch (e) {
+      // Silently fail — user can use password
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleLogin = async () => {
     if (!identifier || !password) {
@@ -106,6 +135,19 @@ export default function LoginScreen() {
                 title="Login"
                 onPress={handleLogin}
                 isLoading={loading} />
+
+              {/* Biometric login button */}
+              {biometricsAvailable && biometricsEnabled && (
+                <TouchableOpacity
+                  style={styles.biometricButton}
+                  onPress={handleBiometricLogin}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="finger-print" size={28} color={Colors.textWhite} />
+                  <Text style={styles.biometricText}>Use Biometrics</Text>
+                </TouchableOpacity>
+              )}
+
               {!isChildMode && (
                 <TouchableOpacity
                   onPress={() => router.push('/register')}
@@ -158,6 +200,24 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     width: '50%',
     alignItems: 'center'
+  },
+  biometricButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    marginTop: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 30,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.3)',
+  },
+  biometricText: {
+    color: Colors.textWhite,
+    fontSize: 15,
+    fontWeight: '600',
   },
   switchTextContainer: {
     marginTop: 30,

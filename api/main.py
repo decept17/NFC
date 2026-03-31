@@ -4,7 +4,7 @@ from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from db.database import get_db
 from services.services import PaymentService
-from db.models import Account, Merchant, User, Transaction, NFCTag, Notification
+from db.models import Account, Merchant, User, Transaction, NFCTag, Notification, Limit
 from typing import List
 from pydantic import BaseModel, Field
 from uuid import UUID
@@ -600,6 +600,90 @@ def provision_tag(
     }
 
 
+# ----- Spending Limits Routes -----
+
+class LimitsRequest(BaseModel):
+    daily_spending_limit: float = Field(0, description="Max daily spend in GBP (0 = no limit)")
+    single_transaction_max: float = Field(0, description="Max per-transaction in GBP (0 = no limit)")
+    blocked_categories: list[str] = Field(default_factory=list, description="List of blocked category names")
+
+@app.get("/api/accounts/{account_id}/limits")
+def get_limits(
+    account_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Fetch spending limits for a child account."""
+    from db.models import Limit
+
+    account = db.query(Account).filter(Account.account_id == account_id).first()
+    if not account:
+        raise HTTPException(status_code=404, detail="Account not found")
+
+    # Verify parent owns this child
+    child = db.query(User).filter(User.user_id == account.owner_id).first()
+    if not child or child.parent_id != current_user.user_id:
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+    limits = db.query(Limit).filter(Limit.child_account_id == account_id).first()
+
+    if not limits:
+        return {
+            "daily_spending_limit": 0,
+            "single_transaction_max": 0,
+            "blocked_categories": [],
+        }
+
+    return {
+        "daily_spending_limit": float(limits.daily_spending_limit),
+        "single_transaction_max": float(limits.single_transaction_max),
+        "blocked_categories": limits.blocked_categories or [],
+    }
+
+
+@app.put("/api/accounts/{account_id}/limits")
+def update_limits(
+    account_id: UUID,
+    request: LimitsRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Create or update spending limits for a child account."""
+    from db.models import Limit
+
+    account = db.query(Account).filter(Account.account_id == account_id).first()
+    if not account:
+        raise HTTPException(status_code=404, detail="Account not found")
+
+    child = db.query(User).filter(User.user_id == account.owner_id).first()
+    if not child or child.parent_id != current_user.user_id:
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+    limits = db.query(Limit).filter(Limit.child_account_id == account_id).first()
+
+    if limits:
+        limits.daily_spending_limit = request.daily_spending_limit
+        limits.single_transaction_max = request.single_transaction_max
+        limits.blocked_categories = request.blocked_categories
+    else:
+        limits = Limit(
+            child_account_id=account_id,
+            daily_spending_limit=request.daily_spending_limit,
+            single_transaction_max=request.single_transaction_max,
+            blocked_categories=request.blocked_categories,
+        )
+        db.add(limits)
+
+    db.commit()
+
+    return {
+        "success": True,
+        "daily_spending_limit": float(limits.daily_spending_limit),
+        "single_transaction_max": float(limits.single_transaction_max),
+        "blocked_categories": limits.blocked_categories or [],
+    }
+
+
 # ----- Child-Specific Routes -----
 
 @app.get("/api/child/my-account")
@@ -683,5 +767,28 @@ def get_notifications(
             "status": n.status,
             "created_at": n.created_at.isoformat() if n.created_at else None,
         })
-
     return result
+
+
+@app.patch("/api/notifications/{notification_id}/dismiss")
+def dismiss_notification(
+    notification_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Mark a notification as dismissed."""
+    if current_user.role != "parent":
+        raise HTTPException(status_code=403, detail="Only parents can dismiss notifications")
+
+    notification = db.query(Notification).filter(
+        Notification.notification_id == notification_id,
+        Notification.parent_id == current_user.user_id
+    ).first()
+
+    if not notification:
+        raise HTTPException(status_code=404, detail="Notification not found")
+
+    notification.status = "dismissed"
+    db.commit()
+
+    return {"success": True}
