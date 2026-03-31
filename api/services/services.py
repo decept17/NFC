@@ -84,7 +84,7 @@ class PaymentService:
     #  CHILD TAPS WRISTBAND (The Core Transaction)
     # ---------------------------------------------------------
     @staticmethod
-    def process_nfc_transaction(db: Session, nfc_token_id: str, amount: float, merchant_id: str, category: str, school_stripe_id: str):
+    def process_nfc_transaction(db: Session, nfc_token_id: str, amount: float, merchant_id: str, category: str, school_stripe_id: str, merchant_name: str = None):
         try:
 
             # Find the physical tag first 
@@ -150,17 +150,24 @@ class PaymentService:
                 db.commit()
                 return {"success": False, "message": failure_reason}
 
-            #  EXECUTE STRIPE TRANSFER
-            # This money will go to merchant stripe account
-            try:
-                transfer = stripe.Transfer.create(
-                    amount=int(amount * 100),
-                    currency='gbp',
-                    destination=school_stripe_id,
-                    description=f"Payment from {account.account_id}"
-                )
-            except Exception as e:
-                return {"success": False, "message": f"Stripe Transfer failed: {str(e)}"}
+            #  EXECUTE STRIPE TRANSFER (skip in development mode)
+            environment = os.getenv("ENVIRONMENT", "production")
+            transfer_id = None
+
+            if environment == "development":
+                # In dev mode, skip Stripe Connect — just deduct the balance
+                transfer_id = "dev_skip_stripe"
+            else:
+                try:
+                    transfer = stripe.Transfer.create(
+                        amount=int(amount * 100),
+                        currency='gbp',
+                        destination=school_stripe_id,
+                        description=f"Payment from {account.account_id}"
+                    )
+                    transfer_id = transfer.id
+                except Exception as e:
+                    return {"success": False, "message": f"Stripe Transfer failed: {str(e)}"}
 
             # SUCCESS: UPDATE DB & LOG
             account.balance = float(account.balance) - amount
@@ -171,7 +178,8 @@ class PaymentService:
                 type="Payment",
                 status="Success",
                 merchant_id=str(merchant_id),
-                stripe_transfer_id=transfer.id # Save proof of payment
+                merchant_name=merchant_name,
+                stripe_transfer_id=transfer_id
             )
             db.add(success_tx)
             db.commit()

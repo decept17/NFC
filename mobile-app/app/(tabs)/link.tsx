@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, Dimensions, FlatList, TouchableOpacity, Alert, TextInput } from 'react-native';
+import { View, Text, StyleSheet, Dimensions, FlatList, TouchableOpacity, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -47,14 +47,7 @@ export default function LinkScreen() {
     }
   };
 
-  const [authKey, setAuthKey] = useState('');
-
   const handleStartConnection = async () => {
-    if (!authKey || authKey.length !== 32) {
-      Alert.alert('Missing Key', 'Please enter the 32-character AES auth key printed on the provisioning sheet for this wristband.');
-      return;
-    }
-
     setIsConnecting(true);
 
     try {
@@ -109,10 +102,11 @@ export default function LinkScreen() {
 
       console.log('[NFC] SUN params — uid:', uid, 'counter:', counter, 'cmac:', cmac);
 
-      // 5. Send UID + auth_key to the backend to register the wristband
+      // 5. Send UID to the backend to link the wristband to the child's account
+      //    The auth_key is already stored from provisioning — no need to pass it
       const response = await fetchApi(`/accounts/${selectedAccount?.id}/link-nfc`, {
         method: 'POST',
-        body: JSON.stringify({ nfc_uid: uid, auth_key: authKey })
+        body: JSON.stringify({ nfc_uid: uid })
       });
 
       if (!response.ok) {
@@ -191,17 +185,6 @@ export default function LinkScreen() {
           </View>
 
           <View style={styles.buttonContainer}>
-            {/* Auth Key Input */}
-            <TextInput
-              style={styles.authKeyInput}
-              placeholder="AES Auth Key (32 hex chars)"
-              placeholderTextColor="rgba(255,255,255,0.6)"
-              value={authKey}
-              onChangeText={setAuthKey}
-              autoCapitalize="none"
-              autoCorrect={false}
-              maxLength={32}
-            />
             {/* DYNAMIC BUTTON TEXT */}
             <PillButton
               title={`Connect ${selectedAccount?.name}`}
@@ -324,17 +307,4 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.3)',
     elevation: 0,
   },
-  authKeyInput: {
-    backgroundColor: 'rgba(255, 255, 255, 0.25)',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    color: '#fff',
-    fontSize: 14,
-    fontFamily: 'monospace',
-    width: '80%',
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.4)',
-  }
 });

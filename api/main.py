@@ -28,14 +28,16 @@ def read_root():
 # --- Pydantic Models For data request validation
 class LinkNFCRequest(BaseModel):
     nfc_uid: str = Field(..., description="NFC tag UID (from the chip's SUN URL uid= param)")
-    auth_key: str = Field(..., description="AES-128 key (32 hex chars) provisioned into the chip")
 
 # ensures we only send safe data back to the app (filtering out internal IDs)
 class TransactionResponse(BaseModel):
-    amount: float = Field(...,description="amount of money")
-    description: str = Field(...,description="what has been bought")
-    timestamp: datetime = Field(...,description="Time of transaction")
-    category: str | None = Field(...,description="What category of item is it in? if any")
+    id: str = Field(..., description="Transaction ID")
+    amount: float = Field(..., description="amount of money")
+    description: str = Field(..., description="what has been bought")
+    timestamp: datetime = Field(..., description="Time of transaction")
+    category: str | None = Field(None, description="What category of item is it in? if any")
+    type: str = Field(..., description="Payment, TopUp, Withdrawal, etc.")
+    status: str = Field(..., description="Success, Failed, etc.")
 
 # ---- Account management routes -------
 @app.post("/api/accounts/{account_id}/link-nfc")
@@ -59,27 +61,23 @@ def link_nfc_tag(
     if not child or child.parent_id != current_user.user_id:
         raise HTTPException(status_code=403, detail="Not authorized")
 
-    # 2. Check if tag is already used by someone else
+    # 2. Find the pre-provisioned tag (created by the desktop burner script)
     existing_tag = db.query(NFCTag).filter(NFCTag.nfc_uid == request.nfc_uid).first()
-    if existing_tag:
-         raise HTTPException(status_code=400, detail="This NFC tag is already linked")
+    if not existing_tag:
+        raise HTTPException(status_code=404, detail="This NFC tag has not been provisioned. Run the burner script first.")
+    if existing_tag.user_id is not None:
+        raise HTTPException(status_code=400, detail="This NFC tag is already linked to a child")
+    if not existing_tag.auth_key:
+        raise HTTPException(status_code=500, detail="Provisioned tag is missing its auth key — re-provision the chip")
 
-    # 3. Save the Link (Account table and NFCTag table)
+    # 3. Assign the tag to the child and activate it
+    existing_tag.user_id = account.owner_id
+    existing_tag.status = 'active'
+    existing_tag.label = f"{child.name}'s Wristband" if child.name else "Wristband"
+    existing_tag.last_counter = 0
     account.nfc_token_id = request.nfc_uid
-    
-    # CRITICAL FIX: Create the actual NFCTag record expected by your PaymentService
-    new_tag = NFCTag(
-        nfc_uid=request.nfc_uid,
-        user_id=account.owner_id,
-        status='active',
-        label=f"{child.name}'s Wristband" if child.name else "Wristband",
-        # SUN security fields
-        auth_key=request.auth_key,
-        last_counter=0,   # Start at 0 so any tap counter > 0 is accepted
-    )
-    db.add(new_tag)
     db.commit()
-    
+
     return {"success": True, "message": "Wristband linked successfully"}
 
 @app.post("/api/accounts/{account_id}/freeze")
@@ -135,8 +133,31 @@ def get_history(
         .order_by(Transaction.created_at.desc())\
         .limit(20)\
         .all()
-        
-    return transactions
+
+    # Map DB model fields → mobile app field names
+    result = []
+    for tx in transactions:
+        # Build a human-readable description
+        if tx.type == "Payment":
+            desc = tx.merchant_name or "Payment"
+        elif tx.type == "TopUp":
+            desc = "Top Up"
+        elif tx.type == "Withdrawal":
+            desc = "Withdrawal"
+        else:
+            desc = tx.type or "Transaction"
+
+        result.append(TransactionResponse(
+            id=str(tx.transaction_id),
+            amount=float(tx.amount),
+            description=desc,
+            timestamp=tx.created_at,
+            category=tx.merchant_name,
+            type=tx.type,
+            status=tx.status,
+        ))
+
+    return result
 
 # ------- Authentication routes -------
 @app.post("/api/auth/login")
@@ -414,9 +435,15 @@ async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
     sig_header = request.headers.get("stripe-signature")
     webhook_secret = os.getenv("STRIPE_WEBHOOK_SECRET")
 
+    print(f"[WEBHOOK] Received webhook request")
+    print(f"[WEBHOOK] Signature header present: {bool(sig_header)}")
+    print(f"[WEBHOOK] Webhook secret (first 10 chars): {webhook_secret[:10] if webhook_secret else 'NONE'}...")
+
     try:
         event = stripe.Webhook.construct_event(payload, sig_header, webhook_secret)
+        print(f"[WEBHOOK] ✅ Signature verified. Event type: {event['type']}")
     except Exception as e:
+        print(f"[WEBHOOK] ❌ Signature verification FAILED: {e}")
         raise HTTPException(status_code=400, detail=str(e))
 
     # Only act on successful payments
@@ -425,13 +452,14 @@ async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
         account_id = intent.get("metadata", {}).get("account_id")
         amount_gbp = intent["amount"] / 100.0
 
+        print(f"[WEBHOOK] PaymentIntent succeeded: account_id={account_id}, amount=£{amount_gbp}")
+
         if account_id:
             account = db.query(Account).filter(Account.account_id == account_id).first()
             if account:
-                # Safely update the DB balance
+                old_balance = float(account.balance)
                 account.balance = float(account.balance) + amount_gbp
 
-                # Log the transaction with the Stripe PaymentIntent ID for refund traceability
                 tx = Transaction(
                     account_id=account_id,
                     amount=amount_gbp,
@@ -441,6 +469,13 @@ async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
                 )
                 db.add(tx)
                 db.commit()
+                print(f"[WEBHOOK] ✅ Balance updated: £{old_balance} → £{float(account.balance)}")
+            else:
+                print(f"[WEBHOOK] ⚠️ Account {account_id} not found in DB!")
+        else:
+            print(f"[WEBHOOK] ⚠️ No account_id in PaymentIntent metadata!")
+    else:
+        print(f"[WEBHOOK] Ignoring event type: {event['type']}")
 
     return {"status": "success"}
 
@@ -504,7 +539,8 @@ def process_payment(
         request.amount,
         request.merchantId,
         request.category,
-        merchant.stripe_account_id
+        merchant.stripe_account_id,
+        merchant.name               # e.g. "School Canteen" — stored on the transaction for history
     )
     
     if result["success"]:
@@ -545,18 +581,22 @@ def provision_tag(
         db.commit()
         return {"success": True, "message": "Tag re-provisioned", "uid": request.nfc_uid}
 
-    # New tag — create a stub record (no user_id yet; will be assigned when parent links it)
-    # We create a minimal NFCTag with status "unlinked" so we can track provisioned inventory
-    # user_id is required by the model, so we store None by relaxing the constraint here.
-    # For MVP: provisioned tags without a user_id are linked later via /link-nfc.
-    # The NFCTag.user_id FK requires a real user, so we skip creating it here and just
-    # return the key for the parent to enter on the Link screen.
-    # A cleaner production approach would store provisioned keys in a separate inventory table.
+    # New tag — store in DB as unlinked inventory (user_id=None)
+    # Will be assigned to a child when parent uses the Link Wristband screen
+    new_tag = NFCTag(
+        nfc_uid=request.nfc_uid,
+        user_id=None,
+        status='active',
+        auth_key=request.auth_key,
+        last_counter=0,
+    )
+    db.add(new_tag)
+    db.commit()
+
     return {
         "success": True,
-        "message": "Tag provisioned. Use the Link Wristband screen to assign it to a child.",
+        "message": "Tag provisioned and stored. Use the Link Wristband screen to assign it to a child.",
         "uid": request.nfc_uid,
-        "auth_key": request.auth_key,
     }
 
 

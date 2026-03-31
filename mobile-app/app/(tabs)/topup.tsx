@@ -32,9 +32,10 @@ export default function TopUpScreen() {
     setLoading(true);
 
     try {
-      // Create deep links to automatically return to the app
-      const returnUrlSuccess = Linking.createURL('/(tabs)/home', { queryParams: { payment: 'success' } });
-      const returnUrlCancel = Linking.createURL('/(tabs)/home', { queryParams: { payment: 'cancel' } });
+      // Use a dedicated callback path for Stripe to return to, avoiding routing conflicts
+      const redirectUrl = Linking.createURL('/stripe-redirect');
+      const returnUrlSuccess = `${redirectUrl}?payment=success`;
+      const returnUrlCancel = `${redirectUrl}?payment=cancel`;
 
       // Step 1: Ask our backend to create a Stripe Checkout Session
       const response = await fetchApi(`/accounts/${selectedAccount?.id}/create-checkout-session`, {
@@ -54,27 +55,36 @@ export default function TopUpScreen() {
       const { url } = await response.json();
 
       // Step 2: Open the Stripe Checkout page
-      // openAuthSessionAsync handles the redirect URL. Once Stripe redirects to `mobileapp://...` 
+      // openAuthSessionAsync handles the redirect URL. Once Stripe redirects to `mobileapp://stripe-redirect...` 
       // the browser safely closes and brings the user back into the app natively.
-      const result = await WebBrowser.openAuthSessionAsync(url, Linking.createURL('/'));
+      const result = await WebBrowser.openAuthSessionAsync(url, redirectUrl);
 
       if (result.type === 'success') {
         if (result.url.includes('payment=success')) {
-          Alert.alert(
-            "Success!",
-            `£${numericAmount.toFixed(2)} has been added to ${selectedAccount?.name}'s account.`
-          );
-          router.push('/(tabs)/home');
+          // Delay Alert to allow WebBrowser dismiss animation to finish
+          setTimeout(() => {
+            Alert.alert(
+              "Success!",
+              `£${numericAmount.toFixed(2)} has been added to ${selectedAccount?.name}'s account.`,
+              [{ text: "OK", onPress: () => router.push('/(tabs)/home') }]
+            );
+          }, 500);
         } else {
-          Alert.alert("Cancelled", "Payment was cancelled.");
+          setTimeout(() => {
+            Alert.alert("Cancelled", "Payment was cancelled.");
+          }, 500);
         }
       } else if (result.type === 'cancel' || result.type === 'dismiss') {
-        Alert.alert("Cancelled", "Payment was closed.");
+        setTimeout(() => {
+          Alert.alert("Cancelled", "Payment was closed.");
+        }, 500);
       }
 
     } catch (err) {
       console.error(err);
-      Alert.alert("Error", "Something went wrong.");
+      setTimeout(() => {
+        Alert.alert("Error", "Something went wrong.");
+      }, 500);
     } finally {
       setLoading(false);
     }

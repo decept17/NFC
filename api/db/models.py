@@ -13,7 +13,7 @@ class NFCTag(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     nfc_uid = Column(String, unique=True, nullable=False) # The physical chip ID
-    user_id = Column(UUID(as_uuid=True), ForeignKey('users.user_id'), nullable=False)
+    user_id = Column(UUID(as_uuid=True), ForeignKey('users.user_id'), nullable=True)
     # Use String to match the native 'tag_status' enum already created in init.sql
     status = Column(String, default='active')
     label = Column(String, nullable=True) # e.g., "Blue Wristband"
