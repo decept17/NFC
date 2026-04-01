@@ -6,7 +6,7 @@ import { Colors } from '@/constants/Colours';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { fetchApi } from '@/services/api';
 import { useAuth } from '@/context/AuthContext';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 
 const { width } = Dimensions.get('window');
 
@@ -18,6 +18,7 @@ interface ChildAccount {
 }
 
 export default function ChildHomeScreen() {
+  const router = useRouter();
   const { logout } = useAuth();
   const [account, setAccount] = useState<ChildAccount | null>(null);
   const [loading, setLoading] = useState(true);
@@ -77,6 +78,7 @@ export default function ChildHomeScreen() {
 
   const handleLogout = async () => {
     await logout();
+    router.replace('/');
   };
 
   const isFrozen = account?.status === 'Frozen';

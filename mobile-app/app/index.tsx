@@ -16,28 +16,6 @@ export default function WelcomeScreen() {
         <Text style={styles.logoText}>N3XO</Text>
       </View>
 
-      {/* Toggle: Parent / Child */}
-      <View style={styles.toggleContainer}>
-        <TouchableOpacity
-          style={[styles.toggleOption, mode === 'parent' && styles.toggleActive]}
-          onPress={() => setMode('parent')}
-          activeOpacity={0.8}
-        >
-          <Text style={[styles.toggleText, mode === 'parent' && styles.toggleTextActive]}>
-            Parent
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.toggleOption, mode === 'child' && styles.toggleActive]}
-          onPress={() => setMode('child')}
-          activeOpacity={0.8}
-        >
-          <Text style={[styles.toggleText, mode === 'child' && styles.toggleTextActive]}>
-            Child
-          </Text>
-        </TouchableOpacity>
-      </View>
-
       {/* The Buttons Section */}
       <View style={styles.buttonContainer}>
         <PillButton
@@ -47,6 +25,28 @@ export default function WelcomeScreen() {
         {mode === 'parent' && (
           <PillButton title="Register" onPress={() => router.push('/register')} />
         )}
+
+        {/* Toggle: Parent / Child */}
+        <View style={[styles.toggleContainer, { marginTop: 40 }]}>
+          <TouchableOpacity
+            style={[styles.toggleOption, mode === 'parent' && styles.toggleActive]}
+            onPress={() => setMode('parent')}
+            activeOpacity={0.8}
+          >
+            <Text style={[styles.toggleText, mode === 'parent' && styles.toggleTextActive]}>
+              Parent
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.toggleOption, mode === 'child' && styles.toggleActive]}
+            onPress={() => setMode('child')}
+            activeOpacity={0.8}
+          >
+            <Text style={[styles.toggleText, mode === 'child' && styles.toggleTextActive]}>
+              Child
+            </Text>
+          </TouchableOpacity>
+        </View>
       </View>
     </SafeAreaView>
   );
