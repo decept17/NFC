@@ -49,7 +49,7 @@ export default function ChildHomeScreen() {
         body: JSON.stringify({ message: 'Can I have some money?' }),
       });
       if (response.ok) {
-        Alert.alert('Done! 🔔', 'Your parent has been notified!');
+        Alert.alert('Done!', 'Your parent has been notified!');
       } else {
         Alert.alert('Error', 'Could not send notification.');
       }
@@ -109,7 +109,7 @@ export default function ChildHomeScreen() {
           <Text style={styles.cardName}>{account?.child_name || 'My Account'}</Text>
           <Text style={styles.cardBalance}>£ {account?.balance.toFixed(2) || '0.00'}</Text>
           <Text style={styles.cardStatus}>
-            {isFrozen ? '❄️ Account Frozen' : '✅ Account Active'}
+            {isFrozen ? 'Account Frozen' : 'Account Active'}
           </Text>
         </View>
       </View>

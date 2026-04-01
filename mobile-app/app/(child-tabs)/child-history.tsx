@@ -11,6 +11,7 @@ interface Transaction {
   description: string;
   timestamp: string;
   category: string | null;
+  type: string;
 }
 
 export default function ChildHistoryScreen() {
@@ -46,7 +47,7 @@ export default function ChildHistoryScreen() {
   );
 
   const renderTransaction = ({ item }: { item: Transaction }) => {
-    const isTopUp = item.amount > 0;
+    const isTopUp = item.type === 'TopUp';
     return (
       <View style={styles.transactionRow}>
         <View style={styles.transactionLeft}>
