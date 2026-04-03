@@ -61,9 +61,6 @@ export default function RegisterScreen() {
           {/* Logo */}
           <View style={styles.logoSection}>
             <Text style={styles.logoText}>N3XO</Text>
-            <View style={styles.modePill}>
-              <Text style={styles.modeLabel}>Create an account</Text>
-            </View>
           </View>
 
           {/* Form */}

@@ -125,7 +125,7 @@ export default function LoginScreen() {
             <PillInput
               placeholder={isChildMode ? 'username' : 'email'}
               value={identifier}
-              onChangeText={setIdentifier}
+              onChangeText={(text) => setIdentifier(text.trimEnd())}
               keyboardType={isChildMode ? 'default' : 'email-address'}
             />
             <PillInput

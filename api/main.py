@@ -13,6 +13,7 @@ from datetime import datetime
 from auth import get_password_hash
 from fastapi.responses import RedirectResponse
 from utils.crypto import verify_sun_mac, counter_hex_to_int
+from pydantic import EmailStr
 import os
 import stripe
 
@@ -199,8 +200,8 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
     }
 
 class RegisterRequest(BaseModel):
-    email: str
-    password: str
+    email: Emailstr
+    password: str = Field(..., min_length=6)
 
 @app.post("/api/auth/register")
 def register(request: RegisterRequest, db: Session = Depends(get_db)):
