@@ -2,6 +2,7 @@
 import React, { useState, useCallback } from 'react';
 import { View, Text, StyleSheet, FlatList, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '@/constants/Colours';
 import { fetchApi } from '@/services/api';
 import { useFocusEffect } from 'expo-router';
@@ -16,18 +17,14 @@ interface Transaction {
 
 export default function ChildHistoryScreen() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [accountId, setAccountId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   const fetchData = async () => {
     try {
-      // First get the child's account ID
       const accountRes = await fetchApi('/child/my-account');
       if (!accountRes.ok) return;
       const accountData = await accountRes.json();
-      setAccountId(accountData.account_id);
 
-      // Then fetch history for that account
       const historyRes = await fetchApi(`/accounts/${accountData.account_id}/history`);
       if (historyRes.ok) {
         const data = await historyRes.json();
@@ -50,6 +47,13 @@ export default function ChildHistoryScreen() {
     const isTopUp = item.type === 'TopUp';
     return (
       <View style={styles.transactionRow}>
+        <View style={styles.txIcon}>
+          <Ionicons
+            name={isTopUp ? 'arrow-down-outline' : 'arrow-up-outline'}
+            size={16}
+            color={isTopUp ? Colors.successGreen : Colors.dangerRed}
+          />
+        </View>
         <View style={styles.transactionLeft}>
           <Text style={styles.transactionDesc}>
             {item.description || (isTopUp ? 'Top Up' : 'Payment')}
@@ -60,12 +64,7 @@ export default function ChildHistoryScreen() {
             })}
           </Text>
         </View>
-        <Text
-          style={[
-            styles.transactionAmount,
-            { color: isTopUp ? '#1a7f37' : '#c44' },
-          ]}
-        >
+        <Text style={[styles.transactionAmount, { color: isTopUp ? Colors.successGreen : Colors.dangerRed }]}>
           {isTopUp ? '+' : '-'}£{Math.abs(item.amount).toFixed(2)}
         </Text>
       </View>
@@ -75,17 +74,20 @@ export default function ChildHistoryScreen() {
   if (loading) {
     return (
       <SafeAreaView style={styles.container}>
-        <ActivityIndicator size="large" color={Colors.textWhite} style={{ marginTop: 40 }} />
+        <ActivityIndicator size="large" color={Colors.electricBlue} style={{ marginTop: 60 }} />
       </SafeAreaView>
     );
   }
 
   return (
     <SafeAreaView style={styles.container}>
-      <Text style={styles.title}>Transaction History</Text>
+      <View style={styles.titleRow}>
+        <Text style={styles.title}>Transaction History</Text>
+      </View>
 
       {transactions.length === 0 ? (
         <View style={styles.emptyContainer}>
+          <Ionicons name="receipt-outline" size={52} color={Colors.textMuted} />
           <Text style={styles.emptyText}>No transactions yet</Text>
         </View>
       ) : (
@@ -94,6 +96,7 @@ export default function ChildHistoryScreen() {
           renderItem={renderTransaction}
           keyExtractor={(_, index) => index.toString()}
           contentContainerStyle={styles.listContent}
+          showsVerticalScrollIndicator={false}
         />
       )}
     </SafeAreaView>
@@ -103,53 +106,71 @@ export default function ChildHistoryScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.backgroundBlue,
+    backgroundColor: Colors.deepNavy,
   },
-  title: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: Colors.textWhite,
-    textAlign: 'center',
+  titleRow: {
+    paddingHorizontal: 24,
     paddingTop: 16,
     paddingBottom: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.glassDivider,
+  },
+  title: {
+    fontSize: 26,
+    fontWeight: '800',
+    letterSpacing: -0.5,
+    color: Colors.textWhite,
   },
   emptyContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    gap: 12,
   },
   emptyText: {
     fontSize: 16,
-    color: 'rgba(255,255,255,0.6)',
+    color: Colors.textSecondary,
   },
   listContent: {
     paddingHorizontal: 20,
-    paddingBottom: 100,
+    paddingTop: 16,
+    paddingBottom: 120,
   },
   transactionRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.15)',
+    backgroundColor: Colors.glassCard,
+    borderWidth: 1,
+    borderColor: Colors.glassBorder,
     padding: 16,
-    borderRadius: 16,
+    borderRadius: 18,
     marginBottom: 10,
+    gap: 12,
+  },
+  txIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(77,143,255,0.10)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   transactionLeft: {
     flex: 1,
   },
   transactionDesc: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
     color: Colors.textWhite,
-    marginBottom: 4,
+    marginBottom: 3,
   },
   transactionDate: {
     fontSize: 12,
-    color: 'rgba(255,255,255,0.6)',
+    color: Colors.textSecondary,
   },
   transactionAmount: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '700',
+    letterSpacing: 0.2,
   },
 });

@@ -3,10 +3,11 @@ import React, { JSX } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { TabBarButton } from './TabBarButton';
+import { Colors } from '@/constants/Colours';
 
 export const ChildTabBar = ({ state, descriptors, navigation }: BottomTabBarProps) => {
-  const primaryColor = 'grey';
-  const greyColor = '#00b7cf';
+  const activeColor = Colors.tabBarActive;
+  const inactiveColor = Colors.tabBarInactive;
 
   return (
     <View style={styles.tabbar}>
@@ -29,17 +30,13 @@ export const ChildTabBar = ({ state, descriptors, navigation }: BottomTabBarProp
             target: route.key,
             canPreventDefault: true,
           });
-
           if (!isFocused && !event.defaultPrevented) {
             navigation.navigate(route.name, route.params);
           }
         };
 
         const onLongPress = () => {
-          navigation.emit({
-            type: 'tabLongPress',
-            target: route.key,
-          });
+          navigation.emit({ type: 'tabLongPress', target: route.key });
         };
 
         return (
@@ -49,7 +46,7 @@ export const ChildTabBar = ({ state, descriptors, navigation }: BottomTabBarProp
             onLongPress={onLongPress}
             isFocused={isFocused}
             routeName={route.name}
-            color={isFocused ? primaryColor : greyColor}
+            color={isFocused ? activeColor : inactiveColor}
             label={typeof label === 'string' ? label : route.name}
           />
         );
@@ -65,14 +62,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: '#ffffff',
+    backgroundColor: Colors.tabBarBackground,
     marginHorizontal: 20,
     paddingVertical: 15,
     borderRadius: 25,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 5 },
-    shadowRadius: 10,
-    shadowOpacity: 0.2,
-    elevation: 5,
+    borderWidth: 1,
+    borderColor: Colors.glassBorder,
+    shadowColor: Colors.electricBlue,
+    shadowOffset: { width: 0, height: 8 },
+    shadowRadius: 20,
+    shadowOpacity: 0.25,
+    elevation: 12,
   },
 });

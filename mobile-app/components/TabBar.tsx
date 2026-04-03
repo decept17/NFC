@@ -1,14 +1,15 @@
+// mobile-app/components/TabBar.tsx
 import React, { JSX } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { TabBarButton } from './TabBarButton';
+import { Colors } from '@/constants/Colours';
 
 export const TabBar = ({ state, descriptors, navigation }: BottomTabBarProps) => {
-  // Use your app's theme colors
-  const primaryColor = 'grey'; // active colour
-  const greyColor = '#00b7cf'; // inactive colour
+  const activeColor = Colors.tabBarActive;       // electricBlue
+  const inactiveColor = Colors.tabBarInactive;   // faded white
 
-    return (
+  return (
     <View style={styles.tabbar}>
       {state.routes.map((route, index) => {
         const { options } = descriptors[route.key];
@@ -19,7 +20,7 @@ export const TabBar = ({ state, descriptors, navigation }: BottomTabBarProps) =>
             ? options.title
             : route.name;
 
-        if (['_sitemap', '+not-found','settings'].includes(route.name)) return null;
+        if (['_sitemap', '+not-found', 'settings'].includes(route.name)) return null;
 
         const isFocused = state.index === index;
 
@@ -49,7 +50,7 @@ export const TabBar = ({ state, descriptors, navigation }: BottomTabBarProps) =>
             onLongPress={onLongPress}
             isFocused={isFocused}
             routeName={route.name}
-            color={isFocused ? primaryColor : greyColor}
+            color={isFocused ? activeColor : inactiveColor}
             label={typeof label === 'string' ? label : route.name}
           />
         );
@@ -59,22 +60,23 @@ export const TabBar = ({ state, descriptors, navigation }: BottomTabBarProps) =>
 };
 
 const styles = StyleSheet.create({
-    tabbar: {
-        position: 'absolute', 
-        bottom: 25,
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        backgroundColor: '#ffffff', // Dark background to fit your design
-        marginHorizontal: 20,
-        paddingVertical: 15,
-        borderRadius: 25,
-        // iOS Shadow
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 5 },
-        shadowRadius: 10,
-        shadowOpacity: 0.2,
-        // Android Shadow
-        elevation: 5, 
-    },
+  tabbar: {
+    position: 'absolute',
+    bottom: 25,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: Colors.tabBarBackground,
+    marginHorizontal: 20,
+    paddingVertical: 15,
+    borderRadius: 25,
+    borderWidth: 1,
+    borderColor: Colors.glassBorder,
+    // Pronounced glow for depth on dark background
+    shadowColor: Colors.electricBlue,
+    shadowOffset: { width: 0, height: 8 },
+    shadowRadius: 20,
+    shadowOpacity: 0.25,
+    elevation: 12,
+  },
 });

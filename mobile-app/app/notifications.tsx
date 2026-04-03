@@ -1,3 +1,4 @@
+// mobile-app/app/notifications.tsx
 import React, { useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator
@@ -43,11 +44,8 @@ export default function NotificationsScreen() {
 
   const handleDismiss = async (id: string) => {
     try {
-      const response = await fetchApi(`/notifications/${id}/dismiss`, {
-        method: 'PATCH',
-      });
+      const response = await fetchApi(`/notifications/${id}/dismiss`, { method: 'PATCH' });
       if (response.ok) {
-        // Remove from local state for instant feedback
         setNotifications(prev => prev.filter(n => n.notification_id !== id));
       }
     } catch (e) {
@@ -58,26 +56,22 @@ export default function NotificationsScreen() {
   const formatTime = (iso: string | null) => {
     if (!iso) return '';
     const date = new Date(iso);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
+    const diffMs = new Date().getTime() - date.getTime();
     const diffMins = Math.floor(diffMs / 60000);
-
     if (diffMins < 1) return 'Just now';
     if (diffMins < 60) return `${diffMins}m ago`;
     const diffHours = Math.floor(diffMins / 60);
     if (diffHours < 24) return `${diffHours}h ago`;
-    const diffDays = Math.floor(diffHours / 24);
-    return `${diffDays}d ago`;
+    return `${Math.floor(diffHours / 24)}d ago`;
   };
 
-  // Split into active and dismissed
   const activeNotifications = notifications.filter(n => n.status !== 'dismissed');
   const dismissedCount = notifications.filter(n => n.status === 'dismissed').length;
 
   const renderNotification = ({ item }: { item: NotificationItem }) => (
     <View style={styles.notificationCard}>
       <View style={styles.notificationIcon}>
-        <Ionicons name="notifications" size={22} color={Colors.backgroundBlue} />
+        <Ionicons name="notifications" size={20} color={Colors.electricBlue} />
       </View>
 
       <View style={styles.notificationContent}>
@@ -91,30 +85,33 @@ export default function NotificationsScreen() {
         onPress={() => handleDismiss(item.notification_id)}
         activeOpacity={0.7}
       >
-        <Ionicons name="close-circle" size={24} color="#aaa" />
+        <Ionicons name="close-circle" size={24} color={Colors.textSecondary} />
       </TouchableOpacity>
     </View>
   );
 
   return (
     <SafeAreaView style={styles.safeArea}>
+
       {/* HEADER */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={32} color="#000" />
+        <TouchableOpacity onPress={() => router.back()} style={styles.headerBack}>
+          <Ionicons name="arrow-back" size={20} color={Colors.textWhite} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Notifications</Text>
-        <View style={{ width: 32 }} />
+        <View style={{ width: 38 }} />
       </View>
 
       {loading ? (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={Colors.buttonDark} />
+          <ActivityIndicator size="large" color={Colors.electricBlue} />
         </View>
       ) : activeNotifications.length === 0 ? (
         <View style={styles.emptyContainer}>
-          <Ionicons name="notifications-off-outline" size={60} color="rgba(0,0,0,0.2)" />
-          <Text style={styles.emptyTitle}>No Notifications</Text>
+          <View style={styles.emptyIconRing}>
+            <Ionicons name="notifications-off-outline" size={40} color={Colors.textSecondary} />
+          </View>
+          <Text style={styles.emptyTitle}>All clear!</Text>
           <Text style={styles.emptySubtitle}>
             When your children ping you for money, it will appear here.
           </Text>
@@ -142,12 +139,7 @@ export default function NotificationsScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: Colors.backgroundBlue,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: Colors.deepNavy,
   },
   header: {
     flexDirection: 'row',
@@ -157,13 +149,30 @@ const styles = StyleSheet.create({
     paddingTop: 10,
     paddingBottom: 20,
   },
+  headerBack: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: Colors.glassCard,
+    borderWidth: 1,
+    borderColor: Colors.glassBorder,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   headerTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#222',
+    fontSize: 22,
+    fontWeight: '800',
+    letterSpacing: -0.3,
+    color: Colors.textWhite,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   listContent: {
     paddingHorizontal: 20,
+    paddingTop: 8,
     paddingBottom: 120,
   },
 
@@ -171,7 +180,9 @@ const styles = StyleSheet.create({
   notificationCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.4)',
+    backgroundColor: Colors.glassCard,
+    borderWidth: 1,
+    borderColor: Colors.glassBorder,
     borderRadius: 18,
     padding: 16,
     marginBottom: 12,
@@ -180,7 +191,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: 'rgba(255,255,255,0.6)',
+    backgroundColor: 'rgba(77,143,255,0.12)',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 14,
@@ -191,17 +202,17 @@ const styles = StyleSheet.create({
   childName: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#222',
+    color: Colors.textWhite,
     marginBottom: 2,
   },
   message: {
     fontSize: 14,
-    color: '#444',
+    color: Colors.textSecondary,
     marginBottom: 4,
   },
   time: {
     fontSize: 12,
-    color: '#888',
+    color: Colors.textMuted,
   },
   dismissButton: {
     padding: 6,
@@ -213,23 +224,34 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 40,
-    gap: 12,
+    gap: 14,
+  },
+  emptyIconRing: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: Colors.glassCard,
+    borderWidth: 1,
+    borderColor: Colors.glassBorder,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   emptyTitle: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: '700',
-    color: '#222',
+    color: Colors.textWhite,
   },
   emptySubtitle: {
     fontSize: 14,
-    color: '#555',
+    color: Colors.textSecondary,
     textAlign: 'center',
     lineHeight: 20,
   },
   dismissedLabel: {
     textAlign: 'center',
-    fontSize: 13,
-    color: '#777',
-    marginTop: 10,
+    fontSize: 12,
+    color: Colors.textMuted,
+    marginTop: 12,
+    letterSpacing: 0.3,
   },
 });

@@ -89,7 +89,7 @@ export default function LimitsScreen() {
     return (
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={Colors.buttonDark} />
+          <ActivityIndicator size="large" color={Colors.electricBlue} />
         </View>
       </SafeAreaView>
     );
@@ -104,11 +104,11 @@ export default function LimitsScreen() {
         >
           {/* HEADER */}
           <View style={styles.header}>
-            <TouchableOpacity onPress={() => router.back()}>
-              <Ionicons name="arrow-back" size={32} color="#000" />
+            <TouchableOpacity onPress={() => router.back()} style={styles.headerBack}>
+              <Ionicons name="arrow-back" size={22} color={Colors.textWhite} />
             </TouchableOpacity>
             <Text style={styles.headerTitle}>Spending Limits</Text>
-            <View style={{ width: 32 }} />
+            <View style={{ width: 38 }} />
           </View>
 
           <ScrollView
@@ -178,7 +178,7 @@ export default function LimitsScreen() {
                       <Ionicons
                         name={isBlocked ? 'close-circle' : 'ellipse-outline'}
                         size={16}
-                        color={isBlocked ? '#fff' : '#555'}
+                        color={isBlocked ? Colors.dangerRed : Colors.textSecondary}
                       />
                       <Text
                         style={[
@@ -218,7 +218,7 @@ export default function LimitsScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: Colors.backgroundBlue,
+    backgroundColor: Colors.deepNavy,
   },
   loadingContainer: {
     flex: 1,
@@ -233,40 +233,55 @@ const styles = StyleSheet.create({
     paddingTop: 10,
     paddingBottom: 20,
   },
+  headerBack: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: Colors.glassCard,
+    borderWidth: 1,
+    borderColor: Colors.glassBorder,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   headerTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#222',
+    fontSize: 22,
+    fontWeight: '800',
+    letterSpacing: -0.3,
+    color: Colors.textWhite,
   },
   scrollContent: {
-    paddingHorizontal: 25,
+    paddingHorizontal: 22,
     paddingBottom: 120,
   },
   childName: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: 'rgba(0,0,0,0.5)',
+    fontSize: 12,
+    fontWeight: '700',
+    color: Colors.electricBlue,
+    letterSpacing: 1.5,
+    textTransform: 'uppercase',
     textAlign: 'center',
     marginBottom: 20,
   },
 
-  // Card group — matching settings.tsx style
+  // Card group
   cardGroup: {
-    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+    backgroundColor: Colors.glassCard,
     borderRadius: 20,
     marginBottom: 20,
     paddingVertical: 18,
     paddingHorizontal: 20,
+    borderWidth: 1,
+    borderColor: Colors.glassBorder,
   },
   cardLabel: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#000',
+    fontSize: 16,
+    fontWeight: '700',
+    color: Colors.textWhite,
     marginBottom: 4,
   },
   cardHint: {
     fontSize: 13,
-    color: '#555',
+    color: Colors.textSecondary,
     marginBottom: 14,
     lineHeight: 18,
   },
@@ -275,21 +290,23 @@ const styles = StyleSheet.create({
   inputRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.5)',
-    borderRadius: 14,
+    backgroundColor: Colors.inputBackground,
+    borderRadius: 16,
+    borderWidth: 1.5,
+    borderColor: Colors.glassBorder,
     paddingHorizontal: 16,
     paddingVertical: 4,
   },
   currencySymbol: {
     fontSize: 20,
     fontWeight: '600',
-    color: '#222',
+    color: Colors.electricBlue,
     marginRight: 8,
   },
   amountInput: {
     flex: 1,
     fontSize: 18,
-    color: '#000',
+    color: Colors.textWhite,
     paddingVertical: 12,
   },
 
@@ -306,36 +323,43 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 16,
     borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.5)',
+    backgroundColor: Colors.glassCard,
+    borderWidth: 1,
+    borderColor: Colors.glassBorder,
   },
   categoryChipBlocked: {
-    backgroundColor: '#c44',
+    backgroundColor: 'rgba(255,77,106,0.18)',
+    borderColor: 'rgba(255,77,106,0.45)',
   },
   categoryText: {
     fontSize: 14,
-    fontWeight: '500',
-    color: '#333',
+    fontWeight: '600',
+    color: Colors.textWhite,
   },
   categoryTextBlocked: {
-    color: '#fff',
+    color: Colors.dangerRed,
   },
 
-  // Save button — same style as PillButton
+  // Save button
   saveButton: {
-    backgroundColor: Colors.buttonDark,
+    backgroundColor: Colors.eclipseBlue,
     paddingVertical: 16,
     borderRadius: 30,
     alignItems: 'center',
     marginTop: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 2,
-    elevation: 3,
+    borderWidth: 1,
+    borderColor: 'rgba(77,143,255,0.3)',
+    shadowColor: Colors.electricBlue,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.45,
+    shadowRadius: 12,
+    elevation: 6,
   },
   saveButtonText: {
     color: Colors.textWhite,
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '700',
+    letterSpacing: 0.5,
   },
 });
+

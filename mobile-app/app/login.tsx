@@ -1,3 +1,4 @@
+// mobile-app/app/login.tsx
 import React, { useState, useEffect } from "react";
 import { View, Text, StyleSheet, KeyboardAvoidingView, Platform, TouchableWithoutFeedback, Keyboard, TouchableOpacity, Alert } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
@@ -20,7 +21,6 @@ export default function LoginScreen() {
   const [password, setPassword] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(false);
 
-  // Auto-prompt biometrics on screen load if enabled
   useEffect(() => {
     if (biometricsEnabled && biometricsAvailable) {
       handleBiometricLogin();
@@ -32,7 +32,6 @@ export default function LoginScreen() {
     try {
       const success = await authenticateWithBiometrics();
       if (success) {
-        // The AuthContext already restored the user — just navigate
         const userData = await import('expo-secure-store').then(s => s.getItemAsync('userData'));
         const role = userData ? JSON.parse(userData).role : 'parent';
         if (role === 'child') {
@@ -56,17 +55,14 @@ export default function LoginScreen() {
 
     setLoading(true);
     try {
-      // OAuth2 expects form-encoded data
       const body = new URLSearchParams();
-      body.append('username', identifier); // Backend tries email first, then username
+      body.append('username', identifier);
       body.append('password', password);
 
       const response = await fetchApi('/auth/login', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded'
-        },
-        body: body.toString()
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: body.toString(),
       });
 
       if (!response.ok) {
@@ -80,7 +76,7 @@ export default function LoginScreen() {
               ? [{ text: "OK" }]
               : [
                   { text: "Cancel", style: "cancel" },
-                  { text: "Register", onPress: () => router.push('/register') }
+                  { text: "Register", onPress: () => router.push('/register') },
                 ]
           );
           setLoading(false);
@@ -95,7 +91,6 @@ export default function LoginScreen() {
 
       await login(data.access_token, { id: data.user_id || "unknown", role });
 
-      // Route based on role
       if (role === 'child') {
         router.replace('/(child-tabs)/child-home' as any);
       } else {
@@ -113,37 +108,43 @@ export default function LoginScreen() {
       <SafeAreaView style={styles.container}>
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={styles.inner}>
-          <Text style={styles.logoText}>N3XO</Text>
-          <Text style={styles.modeLabel}>
-            {isChildMode ? '👦 Child Login' : '👨‍👩‍👧 Parent Login'}
-          </Text>
+          style={styles.inner}
+        >
+          {/* Logo */}
+          <View style={styles.logoSection}>
+            <Text style={styles.logoText}>N3XO</Text>
+            <View style={styles.modePill}>
+              <Text style={styles.modeLabel}>
+                {isChildMode ? '👦  Child Login' : '👨‍👩‍👧  Parent Login'}
+              </Text>
+            </View>
+          </View>
+
+          {/* Form */}
           <View style={styles.form}>
             <PillInput
               placeholder={isChildMode ? 'username' : 'email'}
               value={identifier}
               onChangeText={setIdentifier}
-              keyboardType={isChildMode ? 'default' : 'email-address'} />
+              keyboardType={isChildMode ? 'default' : 'email-address'}
+            />
             <PillInput
               placeholder="password"
               secureTextEntry
               value={password}
               onChangeText={setPassword}
             />
-            <View style={styles.buttonContainer}>
-              <PillButton
-                title="Login"
-                onPress={handleLogin}
-                isLoading={loading} />
 
-              {/* Biometric login button */}
+            <View style={styles.buttonContainer}>
+              <PillButton title="Login" onPress={handleLogin} isLoading={loading} />
+
               {biometricsAvailable && biometricsEnabled && (
                 <TouchableOpacity
                   style={styles.biometricButton}
                   onPress={handleBiometricLogin}
                   activeOpacity={0.7}
                 >
-                  <Ionicons name="finger-print" size={28} color={Colors.textWhite} />
+                  <Ionicons name="finger-print" size={26} color={Colors.electricBlue} />
                   <Text style={styles.biometricText}>Use Biometrics</Text>
                 </TouchableOpacity>
               )}
@@ -151,7 +152,8 @@ export default function LoginScreen() {
               {!isChildMode && (
                 <TouchableOpacity
                   onPress={() => router.push('/register')}
-                  style={styles.switchTextContainer}>
+                  style={styles.switchTextContainer}
+                >
                   <Text style={styles.switchText}>Need to register?</Text>
                 </TouchableOpacity>
               )}
@@ -163,43 +165,53 @@ export default function LoginScreen() {
   );
 }
 
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.backgroundPeach,
+    backgroundColor: Colors.deepNavy,
   },
   inner: {
     flex: 1,
     justifyContent: 'flex-start',
     alignItems: 'center',
   },
+  logoSection: {
+    alignItems: 'center',
+    marginTop: 70,
+  },
   logoText: {
-    marginTop: 80,
-    fontSize: 90,
-    fontWeight: 'medium',
-    color: Colors.textOrange,
-    textShadowColor: 'rgba(0, 0, 0, 0.2)',
-    textShadowOffset: { width: 5, height: 5 },
-    textShadowRadius: 10,
+    fontSize: 86,
+    fontWeight: '800',
+    letterSpacing: -2,
+    color: Colors.textWhite,
+    textShadowColor: Colors.electricBlue,
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 28,
+  },
+  modePill: {
+    marginTop: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 20,
+    borderRadius: 20,
+    backgroundColor: Colors.glassCard,
+    borderWidth: 1,
+    borderColor: Colors.glassBorder,
   },
   modeLabel: {
-    fontSize: 18,
+    fontSize: 15,
     fontWeight: '600',
-    color: Colors.textWhite,
-    marginTop: 10,
-    opacity: 0.85,
+    color: Colors.textSecondary,
   },
   form: {
     width: '100%',
     alignItems: 'center',
     marginTop: 'auto',
-    marginBottom: 100,
+    marginBottom: 90,
   },
   buttonContainer: {
     marginBottom: 20,
     width: '50%',
-    alignItems: 'center'
+    alignItems: 'center',
   },
   biometricButton: {
     flexDirection: 'row',
@@ -207,26 +219,25 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 10,
     marginTop: 10,
-    paddingVertical: 12,
+    paddingVertical: 13,
     paddingHorizontal: 24,
     borderRadius: 30,
-    backgroundColor: 'rgba(255,255,255,0.15)',
+    backgroundColor: Colors.glassCard,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.3)',
+    borderColor: Colors.glassBorder,
   },
   biometricText: {
-    color: Colors.textWhite,
+    color: Colors.electricBlue,
     fontSize: 15,
     fontWeight: '600',
   },
   switchTextContainer: {
-    marginTop: 30,
+    marginTop: 28,
     padding: 10,
   },
   switchText: {
-    color: Colors.textWhite,
+    color: Colors.textSecondary,
     fontSize: 14,
-    fontWeight: 'thin',
     textDecorationLine: 'underline',
-  }
+  },
 });

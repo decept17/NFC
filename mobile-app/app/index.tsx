@@ -1,3 +1,4 @@
+// mobile-app/app/index.tsx
 import { Text, View, StyleSheet, TouchableOpacity } from "react-native";
 import { useRouter } from "expo-router";
 import { Colors } from "@/constants/Colours";
@@ -14,6 +15,7 @@ export default function WelcomeScreen() {
       {/* The Logo section */}
       <View style={styles.logoContainer}>
         <Text style={styles.logoText}>N3XO</Text>
+        <Text style={styles.logoTagline}>Smart payments for families</Text>
       </View>
 
       {/* The Buttons Section */}
@@ -55,7 +57,7 @@ export default function WelcomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.backgroundBlue,
+    backgroundColor: Colors.deepNavy,
     justifyContent: 'space-between',
     paddingVertical: 50,
   },
@@ -66,19 +68,30 @@ const styles = StyleSheet.create({
   },
   logoText: {
     fontSize: 90,
-    color: Colors.textOrange,
-    textShadowColor: 'rgba(0, 0, 0, 0.2)',
-    textShadowOffset: { width: 5, height: 5 },
-    textShadowRadius: 10,
+    color: Colors.textWhite,
+    fontWeight: '800',
+    letterSpacing: -2,
+    // Electric blue glow
+    textShadowColor: Colors.electricBlue,
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 30,
   },
+  logoTagline: {
+    fontSize: 14,
+    color: Colors.textSecondary,
+    letterSpacing: 2,
+    textTransform: 'uppercase',
+    marginTop: 8,
+  },
+  // Toggle
   toggleContainer: {
     flexDirection: 'row',
     alignSelf: 'center',
-    backgroundColor: 'rgba(255,255,255,0.15)',
+    backgroundColor: Colors.glassCard,
     borderRadius: 30,
     padding: 4,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.3)',
+    borderColor: Colors.glassBorder,
   },
   toggleOption: {
     paddingVertical: 12,
@@ -86,12 +99,17 @@ const styles = StyleSheet.create({
     borderRadius: 26,
   },
   toggleActive: {
-    backgroundColor: Colors.buttonDark,
+    backgroundColor: Colors.eclipseBlue,
+    shadowColor: Colors.electricBlue,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
+    elevation: 4,
   },
   toggleText: {
     fontSize: 16,
     fontWeight: '600',
-    color: 'rgba(255,255,255,0.6)',
+    color: Colors.tabBarInactive,
   },
   toggleTextActive: {
     color: Colors.textWhite,

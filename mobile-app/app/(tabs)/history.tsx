@@ -1,3 +1,4 @@
+// mobile-app/app/(tabs)/history.tsx
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, SectionList, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -9,10 +10,7 @@ import { fetchApi } from '@/services/api';
 
 export default function HistoryScreen() {
   const router = useRouter();
-
-  // get child
   const { selectedAccount } = useFamily();
-
   const [historyItems, setHistoryItems] = useState<any[]>([]);
 
   useEffect(() => {
@@ -31,13 +29,10 @@ export default function HistoryScreen() {
     fetchHistory();
   }, [selectedAccount?.id]);
 
-  // --- 2. HELPER FUNCTION: Group data by date ---
   const groupTransactions = (transactions: any[]) => {
     const today = new Date();
-
     const todayItems = transactions.filter(t => new Date(t.timestamp).toDateString() === today.toDateString());
     const olderItems = transactions.filter(t => new Date(t.timestamp).toDateString() !== today.toDateString());
-
     return [
       { title: 'Today', data: todayItems },
       { title: 'Older', data: olderItems },
@@ -46,27 +41,43 @@ export default function HistoryScreen() {
 
   const sections = groupTransactions(historyItems);
 
-  // --- 3. RENDER COMPONENTS ---
+  const renderItem = ({ item }: { item: any }) => {
+    const isCredit = item.type === 'TopUp';
+    return (
+      <View style={styles.transactionRow}>
+        {/* Icon */}
+        <View style={styles.txIcon}>
+          <Ionicons
+            name={isCredit ? 'arrow-down-outline' : 'arrow-up-outline'}
+            size={16}
+            color={isCredit ? Colors.successGreen : Colors.dangerRed}
+          />
+        </View>
 
-  const renderItem = ({ item }: { item: any }) => (
-    <View style={styles.transactionRow}>
-      <Text style={styles.itemDescription} numberOfLines={1}>
-        {item.description}
-      </Text>
+        <View style={styles.txDetails}>
+          <Text style={styles.itemDescription} numberOfLines={1}>
+            {item.description}
+          </Text>
+          <Text style={styles.itemTimestamp}>
+            {new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+          </Text>
+        </View>
 
-      {/* Dashed Line spacer */}
-      <View style={styles.dashedLineContainer}>
-        <View style={styles.dashedLine} />
+        <Text style={[
+          styles.itemAmount,
+          { color: isCredit ? Colors.successGreen : Colors.dangerRed }
+        ]}>
+          {isCredit ? '+' : '-'}£{Math.abs(item.amount).toFixed(2)}
+        </Text>
       </View>
-
-      <Text style={styles.itemAmount}>
-        £{item.amount.toFixed(2)}
-      </Text>
-    </View>
-  );
+    );
+  };
 
   const renderSectionHeader = ({ section: { title } }: any) => (
-    <Text style={styles.sectionHeader}>{title}</Text>
+    <View style={styles.sectionHeaderRow}>
+      <Text style={styles.sectionHeader}>{title}</Text>
+      <View style={styles.sectionLine} />
+    </View>
   );
 
   return (
@@ -75,17 +86,16 @@ export default function HistoryScreen() {
       {/* HEADER */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.push('/(tabs)/home')}>
-          <Ionicons name="person-outline" size={32} color={Colors.buttonDark} />
+          <Ionicons name="person-outline" size={28} color={Colors.electricBlue} />
         </TouchableOpacity>
 
-        {/* 5. SHOW WHOSE HISTORY THIS IS */}
         <View style={{ alignItems: 'center' }}>
           <Text style={styles.headerLogo}>N3XO</Text>
           <Text style={styles.subHeader}>{selectedAccount?.name}'s History</Text>
         </View>
 
         <TouchableOpacity onPress={() => router.push('/settings')}>
-          <Ionicons name="ellipsis-vertical" size={28} color={Colors.buttonDark} />
+          <Ionicons name="ellipsis-vertical" size={28} color={Colors.electricBlue} />
         </TouchableOpacity>
       </View>
 
@@ -98,22 +108,28 @@ export default function HistoryScreen() {
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
         stickySectionHeadersEnabled={false}
-        ListEmptyComponent={<Text style={styles.emptyText}>No recent transactions.</Text>}
+        ListEmptyComponent={
+          <View style={styles.emptyContainer}>
+            <Ionicons name="receipt-outline" size={52} color={Colors.textMuted} />
+            <Text style={styles.emptyText}>No recent transactions.</Text>
+          </View>
+        }
       />
+
       <View style={styles.bottomButtonContainer}>
-        <TouchableOpacity style={styles.viewAllButton}>
+        <TouchableOpacity style={styles.viewAllButton} activeOpacity={0.8}>
           <Text style={styles.viewAllText}>View Entire History</Text>
+          <Ionicons name="chevron-forward" size={16} color={Colors.electricBlue} />
         </TouchableOpacity>
       </View>
     </SafeAreaView>
   );
 }
 
-// --- 4. STYLES ---
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: Colors.backgroundPeach,
+    backgroundColor: Colors.deepNavy,
   },
   header: {
     flexDirection: 'row',
@@ -124,88 +140,121 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
   },
   headerLogo: {
-    fontSize: 34,
-    fontWeight: 'bold',
-    color: Colors.textOrange,
-    textShadowColor: 'rgba(0, 0, 0, 0.1)',
-    textShadowOffset: { width: 5, height: 5 },
-    textShadowRadius: 2,
-  },
-
-  // List Styles
-  listContent: {
-    paddingHorizontal: 30,
-    paddingTop: 20,
-    paddingBottom: 120, // CRITICAL: Keeps the "View All" button above your floating tab bar!
-  },
-  sectionHeader: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#333',
-    marginTop: 20,
-    marginBottom: 15,
-  },
-  // Transaction Row Styles
-  transactionRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  itemDescription: {
-    fontSize: 15,
-    color: '#222',
-    maxWidth: '40%', // Prevents long names from pushing the price off screen
-  },
-  dashedLineContainer: {
-    flex: 1,
-    height: 1,
-    marginHorizontal: 10,
-    overflow: 'hidden',
-    justifyContent: 'center',
-  },
-  dashedLine: {
-    width: '100%',
-    height: 1,
-    borderWidth: 1,
-    borderColor: '#555',
-    borderStyle: 'dashed',
-    opacity: 0.5,
-  },
-  itemAmount: {
-    fontSize: 15,
-    color: '#222',
-    fontWeight: '500',
-  },
-
-  // View All Button
-  viewAllButton: {
-    marginTop: 'auto',
-    alignItems: 'center',
-    paddingVertical: 15,
-    borderRadius: 30,
-    backgroundColor: 'rgba(255,255,255,0.3)', // Subtle translucent background
-  },
-  viewAllText: {
-    color: '#222',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  bottomButtonContainer: {
-    paddingHorizontal: 30,
-    paddingTop: 10,
-    paddingBottom: 120, // CRITICAL: This 110px padding pushes the button up so your custom floating tab bar doesn't cover it
-    backgroundColor: Colors.backgroundPeach, // Solid background so scrolling list items hide cleanly behind it
+    fontSize: 28,
+    fontWeight: '800',
+    letterSpacing: -1,
+    color: Colors.textWhite,
+    textShadowColor: Colors.electricBlue,
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 14,
   },
   subHeader: {
     fontSize: 12,
-    color: '#838383',
+    color: Colors.textSecondary,
     fontWeight: '600',
     marginTop: 2,
+    letterSpacing: 0.3,
+  },
+
+  // List
+  listContent: {
+    paddingHorizontal: 24,
+    paddingTop: 10,
+    paddingBottom: 120,
+  },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginTop: 24,
+    marginBottom: 14,
+  },
+  sectionHeader: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: Colors.electricBlue,
+    letterSpacing: 1.2,
+    textTransform: 'uppercase',
+  },
+  sectionLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: Colors.glassDivider,
+  },
+
+  // Transaction Row
+  transactionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.glassCard,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: Colors.glassBorder,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    marginBottom: 10,
+  },
+  txIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(77,143,255,0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  txDetails: {
+    flex: 1,
+  },
+  itemDescription: {
+    fontSize: 15,
+    color: Colors.textWhite,
+    fontWeight: '500',
+  },
+  itemTimestamp: {
+    fontSize: 12,
+    color: Colors.textSecondary,
+    marginTop: 2,
+  },
+  itemAmount: {
+    fontSize: 15,
+    fontWeight: '700',
+    letterSpacing: 0.3,
+  },
+
+  // Empty state
+  emptyContainer: {
+    alignItems: 'center',
+    marginTop: 60,
+    gap: 12,
   },
   emptyText: {
     textAlign: 'center',
-    marginTop: 40,
     fontSize: 16,
-    color: '#555',
+    color: Colors.textSecondary,
+  },
+
+  // View All button
+  viewAllButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 16,
+    borderRadius: 20,
+    backgroundColor: Colors.glassCard,
+    borderWidth: 1,
+    borderColor: Colors.glassBorder,
+  },
+  viewAllText: {
+    color: Colors.textWhite,
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  bottomButtonContainer: {
+    paddingHorizontal: 24,
+    paddingTop: 10,
+    paddingBottom: 120,
+    backgroundColor: Colors.deepNavy,
   },
 });

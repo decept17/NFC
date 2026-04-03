@@ -62,9 +62,7 @@ export default function ChildHomeScreen() {
   const handleToggleFreeze = async () => {
     if (!account) return;
     try {
-      const response = await fetchApi(`/accounts/${account.account_id}/freeze`, {
-        method: 'POST',
-      });
+      const response = await fetchApi(`/accounts/${account.account_id}/freeze`, { method: 'POST' });
       if (response.ok) {
         const data = await response.json();
         setAccount({ ...account, status: data.status });
@@ -82,13 +80,16 @@ export default function ChildHomeScreen() {
   };
 
   const isFrozen = account?.status === 'Frozen';
-  const backgroundColor = isFrozen ? Colors.backgroundPeach : Colors.backgroundBlue;
+  const backgroundColor = isFrozen ? Colors.frozenTeal : Colors.deepNavy;
 
   if (loading) {
     return (
-      <SafeAreaView style={[styles.safeArea, { backgroundColor: Colors.backgroundBlue }]}>
+      <SafeAreaView style={[styles.safeArea, { backgroundColor: Colors.deepNavy }]}>
         <View style={styles.loadingContainer}>
-          <Text style={styles.loadingText}>Loading...</Text>
+          <View style={styles.loadingRing}>
+            <Ionicons name="hourglass-outline" size={32} color={Colors.electricBlue} />
+          </View>
+          <Text style={styles.loadingText}>Loading…</Text>
         </View>
       </SafeAreaView>
     );
@@ -96,22 +97,33 @@ export default function ChildHomeScreen() {
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor }]}>
+
       {/* HEADER */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={handleLogout}>
-          <Ionicons name="log-out-outline" size={28} color={Colors.buttonDark} />
+        <TouchableOpacity onPress={handleLogout} style={styles.headerIconBtn}>
+          <Ionicons name="log-out-outline" size={22} color={Colors.electricBlue} />
         </TouchableOpacity>
         <Text style={styles.headerLogo}>N3XO</Text>
-        <View style={{ width: 28 }} />
+        <View style={{ width: 38 }} />
       </View>
 
       {/* BALANCE CARD */}
       <View style={styles.cardSection}>
-        <View style={styles.card}>
-          <Text style={styles.cardName}>{account?.child_name || 'My Account'}</Text>
-          <Text style={styles.cardBalance}>£ {account?.balance.toFixed(2) || '0.00'}</Text>
+        <View style={[styles.card, isFrozen && styles.cardFrozen]}>
+          {isFrozen && (
+            <View style={styles.frozenBadge}>
+              <Ionicons name="snow-outline" size={12} color={Colors.textWhite} />
+              <Text style={styles.frozenBadgeText}>Frozen</Text>
+            </View>
+          )}
+          <Text style={styles.cardName}>
+            {account?.child_name || 'My Account'}
+          </Text>
+          <Text style={styles.cardBalance}>
+            £ {account?.balance.toFixed(2) || '0.00'}
+          </Text>
           <Text style={styles.cardStatus}>
-            {isFrozen ? 'Account Frozen' : 'Account Active'}
+            {isFrozen ? '❄️  Account Frozen' : '✓  Account Active'}
           </Text>
         </View>
       </View>
@@ -120,11 +132,11 @@ export default function ChildHomeScreen() {
       <View style={styles.actionsSection}>
         {/* Ping Parent */}
         <TouchableOpacity
-          style={styles.actionButton}
+          style={[styles.actionButton, isFrozen && styles.actionButtonFrozen]}
           onPress={handlePingParent}
           activeOpacity={0.8}
         >
-          <Ionicons name="notifications-outline" size={24} color={Colors.textWhite} />
+          <Ionicons name="notifications-outline" size={22} color={Colors.textWhite} />
           <Text style={styles.actionButtonText}>Ping Parent for Money</Text>
         </TouchableOpacity>
 
@@ -132,17 +144,24 @@ export default function ChildHomeScreen() {
         <TouchableOpacity
           style={[
             styles.actionButton,
-            { backgroundColor: isFrozen ? '#1a7f37' : '#c44' },
+            {
+              backgroundColor: isFrozen
+                ? Colors.successGreen
+                : 'rgba(255,77,106,0.18)',
+              borderColor: isFrozen
+                ? Colors.successGreen
+                : 'rgba(255,77,106,0.40)',
+            },
           ]}
           onPress={handleToggleFreeze}
           activeOpacity={0.8}
         >
           <Ionicons
             name={isFrozen ? 'play-circle-outline' : 'snow-outline'}
-            size={24}
-            color={Colors.textWhite}
+            size={22}
+            color={isFrozen ? Colors.textWhite : Colors.dangerRed}
           />
-          <Text style={styles.actionButtonText}>
+          <Text style={[styles.actionButtonText, !isFrozen && { color: Colors.dangerRed }]}>
             {isFrozen ? 'Activate Account' : 'Freeze Account'}
           </Text>
         </TouchableOpacity>
@@ -159,11 +178,25 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    gap: 14,
+  },
+  loadingRing: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: Colors.glassCard,
+    borderWidth: 1,
+    borderColor: Colors.glassBorder,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   loadingText: {
-    fontSize: 18,
-    color: Colors.textWhite,
+    fontSize: 16,
+    color: Colors.textSecondary,
+    fontWeight: '500',
   },
+
+  // Header
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -172,53 +205,99 @@ const styles = StyleSheet.create({
     paddingTop: 10,
     paddingBottom: 20,
   },
+  headerIconBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: Colors.glassCard,
+    borderWidth: 1,
+    borderColor: Colors.glassBorder,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   headerLogo: {
     fontSize: 34,
-    fontWeight: 'bold',
-    color: Colors.textOrange,
-    textShadowColor: 'rgba(0, 0, 0, 0.1)',
-    textShadowOffset: { width: 5, height: 5 },
-    textShadowRadius: 2,
+    fontWeight: '800',
+    letterSpacing: -1,
+    color: Colors.textWhite,
+    textShadowColor: Colors.electricBlue,
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 16,
   },
+  headerLogoFrozen: {
+    color: Colors.textWhite,
+    textShadowColor: 'transparent',
+  },
+
+  // Balance Card
   cardSection: {
     alignItems: 'center',
     marginTop: 40,
   },
   card: {
-    backgroundColor: '#E8F4FA',
-    width: '80%',
-    paddingVertical: 50,
-    borderRadius: 30,
+    backgroundColor: '#131C30',   // Solid opaque — matches home.tsx
+    width: '82%',
+    paddingVertical: 48,
+    paddingHorizontal: 28,
+    borderRadius: 28,
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 5 },
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(77,143,255,0.20)',
+    shadowColor: Colors.electricBlue,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.25,
+    shadowRadius: 20,
     elevation: 10,
+    gap: 8,
+    position: 'relative',
+  },
+  cardFrozen: {
+    backgroundColor: 'transparent',       // Flush with frozen blue background — one colour
+    borderColor: 'rgba(255,255,255,0.22)',
+    shadowOpacity: 0,
+    elevation: 0,
+  },
+  frozenBadge: {
+    position: 'absolute',
+    top: 16,
+    right: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(255,255,255,0.25)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 20,
+  },
+  frozenBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: Colors.textWhite,
   },
   cardName: {
-    fontSize: 20,
-    color: '#555',
-    marginBottom: 10,
+    fontSize: 18,
+    color: Colors.textSecondary,
     fontWeight: '600',
   },
   cardBalance: {
-    fontSize: 45,
-    fontWeight: '500',
-    color: '#000',
-    marginBottom: 10,
+    fontSize: 50,
+    fontWeight: '600',
+    color: Colors.textWhite,
+    letterSpacing: -1,
   },
   cardStatus: {
-    fontSize: 14,
-    color: '#777',
+    fontSize: 13,
+    color: Colors.textSecondary,
     fontWeight: '500',
   },
+
+  // Actions
   actionsSection: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    gap: 16,
-    paddingHorizontal: 30,
+    gap: 14,
+    paddingHorizontal: 28,
     paddingBottom: 100,
   },
   actionButton: {
@@ -226,20 +305,26 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 10,
-    backgroundColor: Colors.buttonDark,
-    paddingVertical: 16,
+    backgroundColor: Colors.eclipseBlue,
+    paddingVertical: 17,
     paddingHorizontal: 28,
     borderRadius: 30,
     width: '100%',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(77,143,255,0.30)',
+    shadowColor: Colors.electricBlue,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 10,
+    elevation: 5,
+  },
+  actionButtonFrozen: {
+    backgroundColor: 'rgba(27,47,232,0.30)',
+    shadowOpacity: 0.15,
   },
   actionButtonText: {
     color: Colors.textWhite,
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '700',
   },
 });
