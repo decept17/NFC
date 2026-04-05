@@ -259,6 +259,28 @@ jobs:
           docker tag nfc-api:${{ github.sha }} ${{ secrets.DOCKER_USERNAME }}/nfc-api:latest
           docker push ${{ secrets.DOCKER_USERNAME }}/nfc-api:latest
 
+      # ── Network diagnostic (TEMPORARY — remove after fixing) ────────────
+      - name: "DEBUG — Test connectivity to staging server"
+        if: steps.preflight.outputs.has_server == 'true'
+        run: |
+          echo "=== Runner public IP ==="
+          curl -s https://ifconfig.me || echo "(could not determine)"
+          echo ""
+          echo "=== Target host ==="
+          echo "Host: ${{ secrets.DEPLOYMENT_HOST_IP }}"
+          echo ""
+          echo "=== DNS lookup ==="
+          nslookup ${{ secrets.DEPLOYMENT_HOST_IP }} || echo "Not a hostname / no DNS entry"
+          echo ""
+          echo "=== TCP connectivity test (port 22, 5s timeout) ==="
+          timeout 5 bash -c "echo >/dev/tcp/${{ secrets.DEPLOYMENT_HOST_IP }}/22" 2>&1 && echo "✅ Port 22 is OPEN" || echo "❌ Port 22 is CLOSED/UNREACHABLE"
+          echo ""
+          echo "=== Netcat test ==="
+          nc -zv -w 5 ${{ secrets.DEPLOYMENT_HOST_IP }} 22 2>&1 || echo "❌ nc failed"
+          echo ""
+          echo "=== Traceroute (first 10 hops) ==="
+          traceroute -m 10 -w 2 ${{ secrets.DEPLOYMENT_HOST_IP }} 2>&1 || echo "(traceroute not available)"
+
       # ── Write .env + Deploy in a single SSH session ────────────────────────
       # Combining both steps eliminates the race condition where .env doesn't
       # exist yet when the deploy step runs. Secrets are passed via `envs`
