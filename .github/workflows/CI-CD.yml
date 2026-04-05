@@ -204,25 +204,53 @@ jobs:
     name: "Deploy to Staging"
     runs-on: ubuntu-latest
     needs: build
+    # Only deploy on main branch pushes (not PRs).
+    # If no staging server secrets are configured, the preflight step below
+    # will exit early with a clear message rather than failing noisily.
     if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
 
     steps:
+      - name: "Preflight — Check staging server is configured"
+        id: preflight
+        env:
+          DEPLOYMENT_HOST_IP: ${{ secrets.DEPLOYMENT_HOST_IP }}
+        run: |
+          if [ -z "$DEPLOYMENT_HOST_IP" ]; then
+            echo "⚠️  DEPLOYMENT_HOST_IP secret is not set — no staging server configured."
+            echo "    Skipping deployment. To enable deployments, add the following secrets"
+            echo "    to this repository (Settings → Secrets → Actions):"
+            echo "      • DEPLOYMENT_HOST_IP     — IP or hostname of your staging server"
+            echo "      • DEPLOYMENT_USERNAME    — SSH user (e.g. ubuntu)"
+            echo "      • SSH_PRIVATE_KEY        — private key authorised on that server"
+            echo "      • STAGING_DB_USER        — Postgres user"
+            echo "      • STAGING_DB_PASSWORD    — Postgres password"
+            echo "      • STAGING_DB_NAME        — Postgres database name"
+            echo "has_server=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "✅ Staging server configured at ${DEPLOYMENT_HOST_IP}. Proceeding."
+            echo "has_server=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Download built image artifact
+        if: steps.preflight.outputs.has_server == 'true'
         uses: actions/download-artifact@v4
         with:
           name: nfc-api-image
           path: /tmp
 
       - name: Load image into Docker
+        if: steps.preflight.outputs.has_server == 'true'
         run: docker load --input /tmp/nfc-api.tar
 
       - name: Log in to Docker Hub
+        if: steps.preflight.outputs.has_server == 'true'
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
       - name: Tag and push image to registry
+        if: steps.preflight.outputs.has_server == 'true'
         run: |
           DOCKER_IMAGE_TAG=${{ secrets.DOCKER_USERNAME }}/nfc-api:${{ github.sha }}
           docker tag nfc-api:${{ github.sha }} $DOCKER_IMAGE_TAG
@@ -231,11 +259,12 @@ jobs:
           docker tag nfc-api:${{ github.sha }} ${{ secrets.DOCKER_USERNAME }}/nfc-api:latest
           docker push ${{ secrets.DOCKER_USERNAME }}/nfc-api:latest
 
-      # ── Write .env file from secrets before deploying ───────────────────────
-      # Passes secrets via `envs` so they arrive as shell env vars on the server.
-      # This avoids embedding ${{ }} expressions inside the heredoc, which
-      # causes a GitHub Actions YAML parse error.
-      - name: Write .env to staging server
+      # ── Write .env + Deploy in a single SSH session ────────────────────────
+      # Combining both steps eliminates the race condition where .env doesn't
+      # exist yet when the deploy step runs. Secrets are passed via `envs`
+      # to avoid ${{ }} expressions inside the heredoc (GitHub YAML parse error).
+      - name: Write .env and deploy to staging server
+        if: steps.preflight.outputs.has_server == 'true'
         uses: appleboy/ssh-action@v1.0.0
         env:
           ENV_JWT_SECRET: ${{ secrets.JWT_SECRET }}
@@ -244,65 +273,65 @@ jobs:
           ENV_STRIPE_SECRET: ${{ secrets.PAYMENT_GATEWAY_SECRET_KEY }}
           ENV_STRIPE_PUBLIC: ${{ secrets.PAYMENT_GATEWAY_PUBLIC_KEY }}
           ENV_DB_PASSWORD: ${{ secrets.STAGING_DB_PASSWORD }}
+          ENV_DB_USER: ${{ secrets.STAGING_DB_USER }}
+          ENV_DB_NAME: ${{ secrets.STAGING_DB_NAME }}
           ENV_ADMIN_KEY: ${{ secrets.ADMIN_PROVISION_KEY }}
+          ENV_DOCKER_USER: ${{ secrets.DOCKER_USERNAME }}
+          ENV_DOCKER_PASS: ${{ secrets.DOCKER_PASSWORD }}
+          ENV_IMAGE_TAG: ${{ github.sha }}
         with:
           host: ${{ secrets.DEPLOYMENT_HOST_IP }}
           username: ${{ secrets.DEPLOYMENT_USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          envs: ENV_JWT_SECRET,ENV_ENCRYPTION_KEY,ENV_STRIPE_WEBHOOK,ENV_STRIPE_SECRET,ENV_STRIPE_PUBLIC,ENV_DB_PASSWORD,ENV_ADMIN_KEY
+          envs: ENV_JWT_SECRET,ENV_ENCRYPTION_KEY,ENV_STRIPE_WEBHOOK,ENV_STRIPE_SECRET,ENV_STRIPE_PUBLIC,ENV_DB_PASSWORD,ENV_DB_USER,ENV_DB_NAME,ENV_ADMIN_KEY,ENV_DOCKER_USER,ENV_DOCKER_PASS,ENV_IMAGE_TAG
           script: |
+            set -e
+
+            # ── Step 1: Write .env ─────────────────────────────────────────────
             mkdir -p /srv/nfc
-            cat > /srv/nfc/.env << ENVEOF
+            cat > /srv/nfc/.env << 'ENVEOF'
             ENVIRONMENT=production
             API_PORT=8000
-            JWT_SECRET=${ENV_JWT_SECRET}
-            ENCRYPTION_KEY_AES=${ENV_ENCRYPTION_KEY}
-            STRIPE_WEBHOOK_SECRET=${ENV_STRIPE_WEBHOOK}
-            PAYMENT_GATEWAY_VENDOR=Stripe
-            PAYMENT_GATEWAY_SECRET_KEY=${ENV_STRIPE_SECRET}
-            PAYMENT_GATEWAY_PUBLIC_KEY=${ENV_STRIPE_PUBLIC}
-            DB_HOST=db
-            DB_PORT=5432
-            DB_USER=nfcuser
-            DB_PASSWORD=${ENV_DB_PASSWORD}
-            DB_NAME=nfc_db
-            ADMIN_PROVISION_KEY=${ENV_ADMIN_KEY}
             ENVEOF
+            # Append secret values separately to avoid heredoc quoting issues
+            printf 'JWT_SECRET=%s\n'                    "${ENV_JWT_SECRET}"    >> /srv/nfc/.env
+            printf 'ENCRYPTION_KEY_AES=%s\n'            "${ENV_ENCRYPTION_KEY}" >> /srv/nfc/.env
+            printf 'STRIPE_WEBHOOK_SECRET=%s\n'         "${ENV_STRIPE_WEBHOOK}" >> /srv/nfc/.env
+            printf 'PAYMENT_GATEWAY_VENDOR=Stripe\n'                             >> /srv/nfc/.env
+            printf 'PAYMENT_GATEWAY_SECRET_KEY=%s\n'   "${ENV_STRIPE_SECRET}"  >> /srv/nfc/.env
+            printf 'PAYMENT_GATEWAY_PUBLIC_KEY=%s\n'   "${ENV_STRIPE_PUBLIC}"  >> /srv/nfc/.env
+            printf 'DB_HOST=db\n'                                                >> /srv/nfc/.env
+            printf 'DB_PORT=5432\n'                                              >> /srv/nfc/.env
+            printf 'DB_USER=%s\n'                       "${ENV_DB_USER}"        >> /srv/nfc/.env
+            printf 'DB_PASSWORD=%s\n'                   "${ENV_DB_PASSWORD}"    >> /srv/nfc/.env
+            printf 'DB_NAME=%s\n'                       "${ENV_DB_NAME}"        >> /srv/nfc/.env
+            printf 'ADMIN_PROVISION_KEY=%s\n'           "${ENV_ADMIN_KEY}"      >> /srv/nfc/.env
             chmod 600 /srv/nfc/.env
             echo "✅ /srv/nfc/.env written successfully."
 
-      - name: Deploy via SSH to staging server
-        uses: appleboy/ssh-action@v1.0.0
-        with:
-          host: ${{ secrets.DEPLOYMENT_HOST_IP }}
-          username: ${{ secrets.DEPLOYMENT_USERNAME }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          script: |
+            # ── Step 2: Deploy ─────────────────────────────────────────────────
             echo "=== Starting N3XO deployment ==="
 
             # Log in to registry on server
-            echo "${{ secrets.DOCKER_PASSWORD }}" | \
-              docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
+            echo "${ENV_DOCKER_PASS}" | \
+              docker login -u "${ENV_DOCKER_USER}" --password-stdin
 
             # Pull the exactly-tagged image for this commit
-            docker pull ${{ secrets.DOCKER_USERNAME }}/nfc-api:${{ github.sha }}
+            docker pull "${ENV_DOCKER_USER}/nfc-api:${ENV_IMAGE_TAG}"
 
             # Gracefully stop & remove old container (ignore errors if not running)
             docker stop nfc_api_staging || true
             docker rm   nfc_api_staging || true
 
             # ── Ensure Postgres is running on this server ──────────────────────
-            # The API container needs a DB to connect to. If you have an external
-            # managed DB (e.g. RDS/Supabase), remove this block and set DB_HOST
-            # in /srv/nfc/.env to point to it.
             if ! docker ps --format '{{.Names}}' | grep -q '^nfc_postgres_staging$'; then
               echo "Starting Postgres container..."
               docker run -d \
                 --name nfc_postgres_staging \
                 --restart unless-stopped \
-                -e POSTGRES_USER="${{ secrets.STAGING_DB_USER }}" \
-                -e POSTGRES_PASSWORD="${{ secrets.STAGING_DB_PASSWORD }}" \
-                -e POSTGRES_DB="${{ secrets.STAGING_DB_NAME }}" \
+                -e POSTGRES_USER="${ENV_DB_USER}" \
+                -e POSTGRES_PASSWORD="${ENV_DB_PASSWORD}" \
+                -e POSTGRES_DB="${ENV_DB_NAME}" \
                 -p 5432:5432 \
                 postgres:16-alpine
               # Wait for Postgres to be ready
@@ -318,7 +347,7 @@ jobs:
               --link nfc_postgres_staging:db \
               -p 8000:8000 \
               --env-file /srv/nfc/.env \
-              ${{ secrets.DOCKER_USERNAME }}/nfc-api:${{ github.sha }}
+              "${ENV_DOCKER_USER}/nfc-api:${ENV_IMAGE_TAG}"
 
             # ── Verify the container actually started ──────────────────────────
             sleep 2
@@ -361,6 +390,7 @@ jobs:
       # for GitHub Actions runner IPs, or this step will always return HTTP 000.
       # If you cannot open the firewall, set continue-on-error: true below.
       - name: "Health Check — External reachability from runner"
+        if: steps.preflight.outputs.has_server == 'true'
         continue-on-error: true
         run: |
           echo "Verifying external reachability of API..."
@@ -387,7 +417,7 @@ jobs:
           exit 0
 
       - name: "Rollback on Health Check Failure"
-        if: failure()
+        if: failure() && steps.preflight.outputs.has_server == 'true'
         uses: appleboy/ssh-action@v1.0.0
         with:
           host: ${{ secrets.DEPLOYMENT_HOST_IP }}
