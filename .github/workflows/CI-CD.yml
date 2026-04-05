@@ -140,11 +140,9 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: mobile-app/package-lock.json
 
       - name: Install Node dependencies
-        run: npm ci --legacy-peer-deps
+        run: npm install --legacy-peer-deps
 
       - name: "Phase 4 — Mobile Component Tests (Auth, Top-Up, NFC)"
         run: |

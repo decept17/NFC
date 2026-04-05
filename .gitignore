@@ -47,3 +47,9 @@ LOGS AND TEMP FILES
 *.tmp
 *.bak
 *.swp
+
+TEST ARTIFACTS
+
+*.db
+api/test_*.txt
+api/test_*.db
