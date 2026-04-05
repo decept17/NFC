@@ -47,11 +47,11 @@ jest.mock('expo-router', () => ({
   useRouter: () => ({ replace: jest.fn(), push: jest.fn() }),
 }));
 
-jest.mock('../../services/api', () => ({
+jest.mock('@/services/api', () => ({
   processNFCPayment: jest.fn(),
 }));
 
-import { processNFCPayment } from '../../services/api';
+import { processNFCPayment } from '@/services/api';
 
 // -------------------------------------------------------------------
 // Minimal test component: simulates the dev-mode NFC inject button

@@ -39,7 +39,7 @@ jest.mock('expo-haptics', () => ({
 // -------------------------------------------------------------------
 // Mock the API service so tests run offline
 // -------------------------------------------------------------------
-jest.mock('../../services/api', () => ({
+jest.mock('@/services/api', () => ({
   loginUser: jest.fn(),
 }));
 
