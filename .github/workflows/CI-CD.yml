@@ -231,6 +231,39 @@ jobs:
           docker tag nfc-api:${{ github.sha }} ${{ secrets.DOCKER_USERNAME }}/nfc-api:latest
           docker push ${{ secrets.DOCKER_USERNAME }}/nfc-api:latest
 
+      # ── Write .env file from secrets before deploying ───────────────────────
+      # This creates /srv/nfc/.env on the staging server so docker run can find it.
+      # Only truly sensitive values are stored as GitHub Secrets.
+      # DB config is hardcoded to match the linked nfc_postgres_staging container.
+      - name: Write .env to staging server
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.DEPLOYMENT_HOST_IP }}
+          username: ${{ secrets.DEPLOYMENT_USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            mkdir -p /srv/nfc
+            # Note: heredoc uses unquoted ENVEOF so ${{ }} values are expanded by
+            # the SSH action before the script runs on the remote server.
+            cat > /srv/nfc/.env << ENVEOF
+            ENVIRONMENT=production
+            API_PORT=8000
+            JWT_SECRET=${{ secrets.JWT_SECRET }}
+            ENCRYPTION_KEY_AES=${{ secrets.ENCRYPTION_KEY_AES }}
+            STRIPE_WEBHOOK_SECRET=${{ secrets.STRIPE_WEBHOOK_SECRET }}
+            PAYMENT_GATEWAY_VENDOR=Stripe
+            PAYMENT_GATEWAY_SECRET_KEY=${{ secrets.PAYMENT_GATEWAY_SECRET_KEY }}
+            PAYMENT_GATEWAY_PUBLIC_KEY=${{ secrets.PAYMENT_GATEWAY_PUBLIC_KEY }}
+            DB_HOST=db
+            DB_PORT=5432
+            DB_USER=nfcuser
+            DB_PASSWORD=${{ secrets.STAGING_DB_PASSWORD }}
+            DB_NAME=nfc_db
+            ADMIN_PROVISION_KEY=${{ secrets.ADMIN_PROVISION_KEY }}
+            ENVEOF
+            chmod 600 /srv/nfc/.env
+            echo "✅ /srv/nfc/.env written successfully."
+
       - name: Deploy via SSH to staging server
         uses: appleboy/ssh-action@v1.0.0
         with:
@@ -251,23 +284,51 @@ jobs:
             docker stop nfc_api_staging || true
             docker rm   nfc_api_staging || true
 
-            # Start the new container
+            # ── Ensure Postgres is running on this server ──────────────────────
+            # The API container needs a DB to connect to. If you have an external
+            # managed DB (e.g. RDS/Supabase), remove this block and set DB_HOST
+            # in /srv/nfc/.env to point to it.
+            if ! docker ps --format '{{.Names}}' | grep -q '^nfc_postgres_staging$'; then
+              echo "Starting Postgres container..."
+              docker run -d \
+                --name nfc_postgres_staging \
+                --restart unless-stopped \
+                -e POSTGRES_USER="${{ secrets.STAGING_DB_USER }}" \
+                -e POSTGRES_PASSWORD="${{ secrets.STAGING_DB_PASSWORD }}" \
+                -e POSTGRES_DB="${{ secrets.STAGING_DB_NAME }}" \
+                -p 5432:5432 \
+                postgres:16-alpine
+              # Wait for Postgres to be ready
+              sleep 8
+            else
+              echo "Postgres container already running."
+            fi
+
+            # Start the new API container
             docker run -d \
               --name nfc_api_staging \
               --restart unless-stopped \
+              --link nfc_postgres_staging:db \
               -p 8000:8000 \
               --env-file /srv/nfc/.env \
               ${{ secrets.DOCKER_USERNAME }}/nfc-api:${{ github.sha }}
 
-            echo "=== Container started — running local health check on server ==="
+            # ── Verify the container actually started ──────────────────────────
+            sleep 2
+            if ! docker ps --format '{{.Names}}' | grep -q '^nfc_api_staging$'; then
+              echo "❌ docker run failed — container did not start."
+              echo "Container logs:"
+              docker logs nfc_api_staging || true
+              exit 1
+            fi
+            echo "=== Container confirmed running — starting health check ==="
 
             # ── Primary health check: runs on the staging server itself ──────────
-            # This avoids firewall/network issues between GitHub runners and the server.
             MAX_RETRIES=18
             SLEEP_SECONDS=5
             API_URL="http://localhost:8000/health"
 
-            # Give the container a moment to initialise before first poll
+            # Give the API time to initialise (DB migrations etc.)
             sleep 10
 
             for i in $(seq 1 $MAX_RETRIES); do
@@ -281,8 +342,10 @@ jobs:
             done
 
             echo "❌ Server-side health check failed after $((10 + MAX_RETRIES * SLEEP_SECONDS))s."
-            echo "Container logs:"
-            docker logs --tail 50 nfc_api_staging || true
+            echo "=== Container logs ==="
+            docker logs --tail 80 nfc_api_staging || true
+            echo "=== Postgres logs ==="
+            docker logs --tail 20 nfc_postgres_staging || true
             exit 1
 
       # ── Secondary external health check ─────────────────────────────────────
