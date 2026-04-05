@@ -232,34 +232,41 @@ jobs:
           docker push ${{ secrets.DOCKER_USERNAME }}/nfc-api:latest
 
       # ── Write .env file from secrets before deploying ───────────────────────
-      # This creates /srv/nfc/.env on the staging server so docker run can find it.
-      # Only truly sensitive values are stored as GitHub Secrets.
-      # DB config is hardcoded to match the linked nfc_postgres_staging container.
+      # Passes secrets via `envs` so they arrive as shell env vars on the server.
+      # This avoids embedding ${{ }} expressions inside the heredoc, which
+      # causes a GitHub Actions YAML parse error.
       - name: Write .env to staging server
         uses: appleboy/ssh-action@v1.0.0
+        env:
+          ENV_JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          ENV_ENCRYPTION_KEY: ${{ secrets.ENCRYPTION_KEY_AES }}
+          ENV_STRIPE_WEBHOOK: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
+          ENV_STRIPE_SECRET: ${{ secrets.PAYMENT_GATEWAY_SECRET_KEY }}
+          ENV_STRIPE_PUBLIC: ${{ secrets.PAYMENT_GATEWAY_PUBLIC_KEY }}
+          ENV_DB_PASSWORD: ${{ secrets.STAGING_DB_PASSWORD }}
+          ENV_ADMIN_KEY: ${{ secrets.ADMIN_PROVISION_KEY }}
         with:
           host: ${{ secrets.DEPLOYMENT_HOST_IP }}
           username: ${{ secrets.DEPLOYMENT_USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
+          envs: ENV_JWT_SECRET,ENV_ENCRYPTION_KEY,ENV_STRIPE_WEBHOOK,ENV_STRIPE_SECRET,ENV_STRIPE_PUBLIC,ENV_DB_PASSWORD,ENV_ADMIN_KEY
           script: |
             mkdir -p /srv/nfc
-            # Note: heredoc uses unquoted ENVEOF so ${{ }} values are expanded by
-            # the SSH action before the script runs on the remote server.
             cat > /srv/nfc/.env << ENVEOF
             ENVIRONMENT=production
             API_PORT=8000
-            JWT_SECRET=${{ secrets.JWT_SECRET }}
-            ENCRYPTION_KEY_AES=${{ secrets.ENCRYPTION_KEY_AES }}
-            STRIPE_WEBHOOK_SECRET=${{ secrets.STRIPE_WEBHOOK_SECRET }}
+            JWT_SECRET=${ENV_JWT_SECRET}
+            ENCRYPTION_KEY_AES=${ENV_ENCRYPTION_KEY}
+            STRIPE_WEBHOOK_SECRET=${ENV_STRIPE_WEBHOOK}
             PAYMENT_GATEWAY_VENDOR=Stripe
-            PAYMENT_GATEWAY_SECRET_KEY=${{ secrets.PAYMENT_GATEWAY_SECRET_KEY }}
-            PAYMENT_GATEWAY_PUBLIC_KEY=${{ secrets.PAYMENT_GATEWAY_PUBLIC_KEY }}
+            PAYMENT_GATEWAY_SECRET_KEY=${ENV_STRIPE_SECRET}
+            PAYMENT_GATEWAY_PUBLIC_KEY=${ENV_STRIPE_PUBLIC}
             DB_HOST=db
             DB_PORT=5432
             DB_USER=nfcuser
-            DB_PASSWORD=${{ secrets.STAGING_DB_PASSWORD }}
+            DB_PASSWORD=${ENV_DB_PASSWORD}
             DB_NAME=nfc_db
-            ADMIN_PROVISION_KEY=${{ secrets.ADMIN_PROVISION_KEY }}
+            ADMIN_PROVISION_KEY=${ENV_ADMIN_KEY}
             ENVEOF
             chmod 600 /srv/nfc/.env
             echo "✅ /srv/nfc/.env written successfully."
