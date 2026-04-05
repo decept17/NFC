@@ -28,6 +28,7 @@ jest.mock('expo-local-authentication', () => ({
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({ replace: jest.fn(), push: jest.fn() }),
+  useLocalSearchParams: () => ({}),
   Link: ({ children }: any) => children,
 }));
 
