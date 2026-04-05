@@ -65,7 +65,7 @@ describe('Login Screen — Rendering', () => {
       expect(screen.getByPlaceholderText(/email/i)).toBeTruthy();
     });
     expect(screen.getByPlaceholderText(/password/i)).toBeTruthy();
-    expect(screen.getByText(/login/i)).toBeTruthy();
+    expect(screen.getByText('Login')).toBeTruthy();
   });
 });
 
@@ -87,7 +87,7 @@ describe('Login Screen — Successful Login Flow', () => {
 
     fireEvent.changeText(screen.getByPlaceholderText(/email/i), 'parent@test.com');
     fireEvent.changeText(screen.getByPlaceholderText(/password/i), 'password123');
-    fireEvent.press(screen.getByText(/login/i));
+    fireEvent.press(screen.getByText('Login'));
 
     await waitFor(() => {
       expect(mockLogin).toHaveBeenCalledWith('parent@test.com', 'password123');
@@ -104,7 +104,7 @@ describe('Login Screen — Successful Login Flow', () => {
 
     fireEvent.changeText(screen.getByPlaceholderText(/email/i), 'bad@test.com');
     fireEvent.changeText(screen.getByPlaceholderText(/password/i), 'wrong');
-    fireEvent.press(screen.getByText(/login/i));
+    fireEvent.press(screen.getByText('Login'));
 
     await waitFor(() => {
       expect(alertSpy).toHaveBeenCalled();
