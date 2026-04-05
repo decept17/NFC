@@ -259,31 +259,62 @@ jobs:
               --env-file /srv/nfc/.env \
               ${{ secrets.DOCKER_USERNAME }}/nfc-api:${{ github.sha }}
 
-            echo "=== Container started, waiting for health check ==="
+            echo "=== Container started — running local health check on server ==="
 
-      # ── Post-deployment health check ────────────────────────────────────────
-      # Polls the API's /health endpoint for up to 60 s after deployment.
-      # If the container doesn't respond in time, the workflow fails and a
-      # rollback is triggered automatically.
-      - name: "Health Check — API /health endpoint"
+            # ── Primary health check: runs on the staging server itself ──────────
+            # This avoids firewall/network issues between GitHub runners and the server.
+            MAX_RETRIES=18
+            SLEEP_SECONDS=5
+            API_URL="http://localhost:8000/health"
+
+            # Give the container a moment to initialise before first poll
+            sleep 10
+
+            for i in $(seq 1 $MAX_RETRIES); do
+              HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 5 --max-time 10 "$API_URL" || echo "000")
+              echo "Attempt $i/$MAX_RETRIES → HTTP $HTTP_STATUS"
+              if [ "$HTTP_STATUS" = "200" ]; then
+                echo "✅ Server-side health check passed."
+                exit 0
+              fi
+              sleep $SLEEP_SECONDS
+            done
+
+            echo "❌ Server-side health check failed after $((10 + MAX_RETRIES * SLEEP_SECONDS))s."
+            echo "Container logs:"
+            docker logs --tail 50 nfc_api_staging || true
+            exit 1
+
+      # ── Secondary external health check ─────────────────────────────────────
+      # Confirms the API is reachable from outside the staging server.
+      # NOTE: Ensure port 8000 is open in your server's firewall/security group
+      # for GitHub Actions runner IPs, or this step will always return HTTP 000.
+      # If you cannot open the firewall, set continue-on-error: true below.
+      - name: "Health Check — External reachability from runner"
+        continue-on-error: true
         run: |
-          echo "Waiting for API to become healthy..."
-          MAX_RETRIES=12
+          echo "Verifying external reachability of API..."
+          MAX_RETRIES=6
           SLEEP_SECONDS=5
           API_URL="http://${{ secrets.DEPLOYMENT_HOST_IP }}:8000/health"
 
           for i in $(seq 1 $MAX_RETRIES); do
-            HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$API_URL" || echo "000")
+            HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+              --connect-timeout 10 \
+              --max-time 15 \
+              "$API_URL" || echo "000")
             echo "Attempt $i/$MAX_RETRIES → HTTP $HTTP_STATUS"
             if [ "$HTTP_STATUS" = "200" ]; then
-              echo "✅ Health check passed."
+              echo "✅ External health check passed."
               exit 0
             fi
             sleep $SLEEP_SECONDS
           done
 
-          echo "❌ Health check failed after $((MAX_RETRIES * SLEEP_SECONDS))s. Triggering rollback..."
-          exit 1
+          echo "⚠️  External check could not reach the API (HTTP $HTTP_STATUS)."
+          echo "    This may indicate a firewall rule blocking runner→server traffic."
+          echo "    The server-side health check already passed, so deployment is likely OK."
+          exit 0
 
       - name: "Rollback on Health Check Failure"
         if: failure()
