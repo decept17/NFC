@@ -26,6 +26,24 @@ app = FastAPI(title="NFC API Backend")
 def read_root():
     return {"message": "NFC Python API is running!"}
 
+
+@app.get("/health")
+def health_check(db: Session = Depends(get_db)):
+    """
+    Health check endpoint — used by CI/CD post-deployment polling and load balancers.
+    Returns 200 if the API and the database are both reachable.
+    Returns 503 if the DB connection fails.
+    """
+    try:
+        from sqlalchemy import text
+        db.execute(text("SELECT 1"))
+        return {"status": "healthy", "database": "connected"}
+    except Exception as exc:
+        raise HTTPException(
+            status_code=503,
+            detail=f"Database connection failed: {exc}"
+        )
+
 # --- Pydantic Models For data request validation
 class LinkNFCRequest(BaseModel):
     nfc_uid: str = Field(..., description="NFC tag UID (from the chip's SUN URL uid= param)")
@@ -200,7 +218,7 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
     }
 
 class RegisterRequest(BaseModel):
-    email: Emailstr
+    email: EmailStr
     password: str = Field(..., min_length=6)
 
 @app.post("/api/auth/register")

@@ -1,0 +1,57 @@
+============================= test session starts =============================
+platform win32 -- Python 3.12.7, pytest-9.0.2, pluggy-1.6.0 -- C:\Users\howar\AppData\Local\Programs\Python\Python312\python.exe
+cachedir: .pytest_cache
+rootdir: C:\Users\howar\NFC\NFC-App\api
+plugins: anyio-4.12.0
+collecting ... collected 42 items
+
+tests/test_crypto.py::TestVerifySunMac::test_valid_mac_accepted PASSED   [  2%]
+tests/test_crypto.py::TestVerifySunMac::test_wrong_mac_rejected PASSED   [  4%]
+tests/test_crypto.py::TestVerifySunMac::test_wrong_key_rejected PASSED   [  7%]
+tests/test_crypto.py::TestVerifySunMac::test_wrong_uid_rejected PASSED   [  9%]
+tests/test_crypto.py::TestVerifySunMac::test_wrong_counter_rejected PASSED [ 11%]
+tests/test_crypto.py::TestVerifySunMac::test_malformed_uid_hex_returns_false PASSED [ 14%]
+tests/test_crypto.py::TestVerifySunMac::test_malformed_cmac_hex_returns_false PASSED [ 16%]
+tests/test_crypto.py::TestVerifySunMac::test_invalid_key_length_returns_false PASSED [ 19%]
+tests/test_crypto.py::TestCounterHexToInt::test_zero_counter PASSED      [ 21%]
+tests/test_crypto.py::TestCounterHexToInt::test_first_tap PASSED         [ 23%]
+tests/test_crypto.py::TestCounterHexToInt::test_tap_21 PASSED            [ 26%]
+tests/test_crypto.py::TestCounterHexToInt::test_large_counter PASSED     [ 28%]
+tests/test_services.py::TestProcessNFCTransaction::test_svc01_insufficient_funds PASSED [ 30%]
+tests/test_services.py::TestProcessNFCTransaction::test_svc02_frozen_tag_blocked PASSED [ 33%]
+tests/test_services.py::TestProcessNFCTransaction::test_svc03_lost_tag_blocked PASSED [ 35%]
+tests/test_services.py::TestProcessNFCTransaction::test_svc04_daily_limit_exceeded PASSED [ 38%]
+tests/test_services.py::TestProcessNFCTransaction::test_svc05_category_blocked PASSED [ 40%]
+tests/test_services.py::TestProcessNFCTransaction::test_svc06_single_tx_limit_exceeded PASSED [ 42%]
+tests/test_services.py::TestProcessNFCTransaction::test_svc07_dev_mode_skips_stripe PASSED [ 45%]
+tests/test_services.py::TestProcessNFCTransaction::test_svc_tag_not_found PASSED [ 47%]
+tests/test_services.py::TestWithdrawService::test_svc08_withdraw_insufficient_funds SKIPPED [ 50%]
+tests/test_services.py::TestWithdrawService::test_svc09_withdraw_no_top_up_charge_id SKIPPED [ 52%]
+tests/test_services.py::TestTopUpIntentService::test_svc10_create_top_up_intent_success PASSED [ 54%]
+tests/test_services.py::TestTopUpIntentService::test_svc10_create_top_up_intent_stripe_error PASSED [ 57%]
+tests/test_stripe.py::TestTopUpFlow::test_str01_payment_intent_created_successfully PASSED [ 59%]
+tests/test_stripe.py::TestTopUpFlow::test_str02_checkout_session_created_successfully PASSED [ 61%]
+tests/test_stripe.py::TestTopUpFlow::test_str03_top_up_stripe_exception_returns_failure PASSED [ 64%]
+tests/test_stripe.py::TestTopUpFlow::test_str03b_checkout_session_stripe_exception PASSED [ 66%]
+tests/test_stripe.py::TestNFCTransferFlow::test_str04_stripe_transfer_id_saved_on_success PASSED [ 69%]
+tests/test_stripe.py::TestNFCTransferFlow::test_str05_stripe_transfer_failure_rolls_back_balance PASSED [ 71%]
+tests/test_stripe.py::TestNFCTransferFlow::test_str06_merchant_missing_stripe_id_blocks_payment PASSED [ 73%]
+tests/test_stripe.py::TestWithdrawalFlow::test_str07_partial_refund_issued_against_original_charge SKIPPED [ 76%]
+tests/test_stripe.py::TestWithdrawalFlow::test_str08_refund_stripe_failure_rolls_back_balance SKIPPED [ 78%]
+tests/test_main.py::TestAuthAndRBAC::test_login_success PASSED           [ 80%]
+tests/test_main.py::TestAuthAndRBAC::test_login_invalid_password PASSED  [ 83%]
+tests/test_main.py::TestAuthAndRBAC::test_login_nonexistent_email PASSED [ 85%]
+tests/test_main.py::TestAuthAndRBAC::test_expired_token_returns_401 PASSED [ 88%]
+tests/test_main.py::TestAuthAndRBAC::test_data_isolation_parent_cannot_see_other_family PASSED [ 90%]
+tests/test_main.py::TestAccountManagement::test_link_nfc_tag_success PASSED [ 92%]
+tests/test_main.py::TestAccountManagement::test_link_duplicate_nfc_raises_400 PASSED [ 95%]
+tests/test_main.py::TestAccountManagement::test_freeze_account_toggles_status PASSED [ 97%]
+tests/test_main.py::TestAccountManagement::test_frozen_wristband_blocks_nfc_payment PASSED [100%]
+
+============================== warnings summary ===============================
+db\database.py:13
+  C:\Users\howar\NFC\NFC-App\api\tests\..\db\database.py:13: MovedIn20Warning: The ``declarative_base()`` function is now available as sqlalchemy.orm.declarative_base(). (deprecated since: 2.0) (Background on SQLAlchemy 2.0 at: https://sqlalche.me/e/b8d9)
+    Base = declarative_base()
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+================== 38 passed, 4 skipped, 1 warning in 4.17s ===================

@@ -38,5 +38,24 @@ services:
       POSTGRES_PASSWORD: ${DB_PASSWORD:-nfcpassword}
       POSTGRES_DB: ${DB_NAME:-nfc_db}
 
+  # 3. Test Database Service (PostgreSQL - Isolated for Integration Tests ONLY)
+  # Runs on port 5433 so it NEVER conflicts with the dev database.
+  # Start with: docker-compose up test_db
+  # Run integration tests with: pytest tests/test_integration.py -m integration
+  test_db:
+    image: postgres:16-alpine
+    container_name: nfc_postgres_test_db
+    ports:
+      - "5433:5432"
+    # Ephemeral: no volume mount — data is wiped when the container is removed.
+    # This ensures every test run starts from a clean slate.
+    environment:
+      POSTGRES_USER: nfcuser
+      POSTGRES_PASSWORD: nfcpassword
+      POSTGRES_DB: nfc_test_db
+    # Only starts when explicitly requested — does not start with `docker-compose up`
+    profiles:
+      - testing
+
 volumes:
   postgres_data:

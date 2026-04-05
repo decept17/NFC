@@ -1,0 +1,141 @@
+============================= test session starts =============================
+platform win32 -- Python 3.12.7, pytest-9.0.2, pluggy-1.6.0 -- C:\Users\howar\AppData\Local\Programs\Python\Python312\python.exe
+cachedir: .pytest_cache
+rootdir: C:\Users\howar\NFC\NFC-App\api
+plugins: anyio-4.12.0
+collecting ... collected 30 items
+
+tests/test_main.py::TestAuthAndRBAC::test_login_success ERROR            [  3%]
+tests/test_main.py::TestAuthAndRBAC::test_login_invalid_password ERROR   [  6%]
+tests/test_main.py::TestAuthAndRBAC::test_login_nonexistent_email ERROR  [ 10%]
+tests/test_main.py::TestAuthAndRBAC::test_expired_token_returns_401 ERROR [ 13%]
+tests/test_main.py::TestAuthAndRBAC::test_data_isolation_parent_cannot_see_other_family ERROR [ 16%]
+tests/test_main.py::TestAccountManagement::test_link_nfc_tag_success ERROR [ 20%]
+tests/test_main.py::TestAccountManagement::test_link_duplicate_nfc_raises_400 ERROR [ 23%]
+tests/test_main.py::TestAccountManagement::test_freeze_account_toggles_status ERROR [ 26%]
+tests/test_main.py::TestAccountManagement::test_frozen_wristband_blocks_nfc_payment ERROR [ 30%]
+tests/test_services.py::TestProcessNFCTransaction::test_svc01_insufficient_funds PASSED [ 33%]
+tests/test_services.py::TestProcessNFCTransaction::test_svc02_frozen_tag_blocked PASSED [ 36%]
+tests/test_services.py::TestProcessNFCTransaction::test_svc03_lost_tag_blocked PASSED [ 40%]
+tests/test_services.py::TestProcessNFCTransaction::test_svc04_daily_limit_exceeded FAILED [ 43%]
+tests/test_services.py::TestProcessNFCTransaction::test_svc05_category_blocked PASSED [ 46%]
+tests/test_services.py::TestProcessNFCTransaction::test_svc06_single_tx_limit_exceeded PASSED [ 50%]
+tests/test_services.py::TestProcessNFCTransaction::test_svc07_dev_mode_skips_stripe PASSED [ 53%]
+tests/test_services.py::TestProcessNFCTransaction::test_svc_tag_not_found PASSED [ 56%]
+tests/test_services.py::TestWithdrawService::test_svc08_withdraw_insufficient_funds SKIPPED [ 60%]
+tests/test_services.py::TestWithdrawService::test_svc09_withdraw_no_top_up_charge_id SKIPPED [ 63%]
+tests/test_services.py::TestTopUpIntentService::test_svc10_create_top_up_intent_success PASSED [ 66%]
+tests/test_services.py::TestTopUpIntentService::test_svc10_create_top_up_intent_stripe_error PASSED [ 70%]
+tests/test_stripe.py::TestTopUpFlow::test_str01_payment_intent_created_successfully PASSED [ 73%]
+tests/test_stripe.py::TestTopUpFlow::test_str02_checkout_session_created_successfully PASSED [ 76%]
+tests/test_stripe.py::TestTopUpFlow::test_str03_top_up_stripe_exception_returns_failure PASSED [ 80%]
+tests/test_stripe.py::TestTopUpFlow::test_str03b_checkout_session_stripe_exception PASSED [ 83%]
+tests/test_stripe.py::TestNFCTransferFlow::test_str04_stripe_transfer_id_saved_on_success PASSED [ 86%]
+tests/test_stripe.py::TestNFCTransferFlow::test_str05_stripe_transfer_failure_rolls_back_balance PASSED [ 90%]
+tests/test_stripe.py::TestNFCTransferFlow::test_str06_merchant_missing_stripe_id_blocks_payment FAILED [ 93%]
+tests/test_stripe.py::TestWithdrawalFlow::test_str07_partial_refund_issued_against_original_charge SKIPPED [ 96%]
+tests/test_stripe.py::TestWithdrawalFlow::test_str08_refund_stripe_failure_rolls_back_balance SKIPPED [100%]
+
+=================================== ERRORS ====================================
+____________ ERROR at setup of TestAuthAndRBAC.test_login_success _____________
+E   AttributeError: 'SQLiteTypeCompiler' object has no attribute 'visit_ARRAY'. Did you mean: 'visit_REAL'?
+
+The above exception was the direct cause of the following exception:
+E   sqlalchemy.exc.UnsupportedCompilationError: Compiler <sqlalchemy.dialects.sqlite.base.SQLiteTypeCompiler object at 0x000002EC2E6E5670> can't render element of type ARRAY (Background on this error at: https://sqlalche.me/e/20/l7de)
+
+The above exception was the direct cause of the following exception:
+E   sqlalchemy.exc.CompileError: (in table 'limits', column 'blocked_categories'): Compiler <sqlalchemy.dialects.sqlite.base.SQLiteTypeCompiler object at 0x000002EC2E6E5670> can't render element of type ARRAY
+________ ERROR at setup of TestAuthAndRBAC.test_login_invalid_password ________
+E   AttributeError: 'SQLiteTypeCompiler' object has no attribute 'visit_ARRAY'. Did you mean: 'visit_REAL'?
+
+The above exception was the direct cause of the following exception:
+E   sqlalchemy.exc.UnsupportedCompilationError: Compiler <sqlalchemy.dialects.sqlite.base.SQLiteTypeCompiler object at 0x000002EC2E6E5670> can't render element of type ARRAY (Background on this error at: https://sqlalche.me/e/20/l7de)
+
+The above exception was the direct cause of the following exception:
+E   sqlalchemy.exc.CompileError: (in table 'limits', column 'blocked_categories'): Compiler <sqlalchemy.dialects.sqlite.base.SQLiteTypeCompiler object at 0x000002EC2E6E5670> can't render element of type ARRAY
+_______ ERROR at setup of TestAuthAndRBAC.test_login_nonexistent_email ________
+E   AttributeError: 'SQLiteTypeCompiler' object has no attribute 'visit_ARRAY'. Did you mean: 'visit_REAL'?
+
+The above exception was the direct cause of the following exception:
+E   sqlalchemy.exc.UnsupportedCompilationError: Compiler <sqlalchemy.dialects.sqlite.base.SQLiteTypeCompiler object at 0x000002EC2E6E5670> can't render element of type ARRAY (Background on this error at: https://sqlalche.me/e/20/l7de)
+
+The above exception was the direct cause of the following exception:
+E   sqlalchemy.exc.CompileError: (in table 'limits', column 'blocked_categories'): Compiler <sqlalchemy.dialects.sqlite.base.SQLiteTypeCompiler object at 0x000002EC2E6E5670> can't render element of type ARRAY
+______ ERROR at setup of TestAuthAndRBAC.test_expired_token_returns_401 _______
+E   AttributeError: 'SQLiteTypeCompiler' object has no attribute 'visit_ARRAY'. Did you mean: 'visit_REAL'?
+
+The above exception was the direct cause of the following exception:
+E   sqlalchemy.exc.UnsupportedCompilationError: Compiler <sqlalchemy.dialects.sqlite.base.SQLiteTypeCompiler object at 0x000002EC2E6E5670> can't render element of type ARRAY (Background on this error at: https://sqlalche.me/e/20/l7de)
+
+The above exception was the direct cause of the following exception:
+E   sqlalchemy.exc.CompileError: (in table 'limits', column 'blocked_categories'): Compiler <sqlalchemy.dialects.sqlite.base.SQLiteTypeCompiler object at 0x000002EC2E6E5670> can't render element of type ARRAY
+_ ERROR at setup of TestAuthAndRBAC.test_data_isolation_parent_cannot_see_other_family _
+E   AttributeError: 'SQLiteTypeCompiler' object has no attribute 'visit_ARRAY'. Did you mean: 'visit_REAL'?
+
+The above exception was the direct cause of the following exception:
+E   sqlalchemy.exc.UnsupportedCompilationError: Compiler <sqlalchemy.dialects.sqlite.base.SQLiteTypeCompiler object at 0x000002EC2E6E5670> can't render element of type ARRAY (Background on this error at: https://sqlalche.me/e/20/l7de)
+
+The above exception was the direct cause of the following exception:
+E   sqlalchemy.exc.CompileError: (in table 'limits', column 'blocked_categories'): Compiler <sqlalchemy.dialects.sqlite.base.SQLiteTypeCompiler object at 0x000002EC2E6E5670> can't render element of type ARRAY
+______ ERROR at setup of TestAccountManagement.test_link_nfc_tag_success ______
+E   AttributeError: 'SQLiteTypeCompiler' object has no attribute 'visit_ARRAY'. Did you mean: 'visit_REAL'?
+
+The above exception was the direct cause of the following exception:
+E   sqlalchemy.exc.UnsupportedCompilationError: Compiler <sqlalchemy.dialects.sqlite.base.SQLiteTypeCompiler object at 0x000002EC2E6E5670> can't render element of type ARRAY (Background on this error at: https://sqlalche.me/e/20/l7de)
+
+The above exception was the direct cause of the following exception:
+E   sqlalchemy.exc.CompileError: (in table 'limits', column 'blocked_categories'): Compiler <sqlalchemy.dialects.sqlite.base.SQLiteTypeCompiler object at 0x000002EC2E6E5670> can't render element of type ARRAY
+_ ERROR at setup of TestAccountManagement.test_link_duplicate_nfc_raises_400 __
+E   AttributeError: 'SQLiteTypeCompiler' object has no attribute 'visit_ARRAY'. Did you mean: 'visit_REAL'?
+
+The above exception was the direct cause of the following exception:
+E   sqlalchemy.exc.UnsupportedCompilationError: Compiler <sqlalchemy.dialects.sqlite.base.SQLiteTypeCompiler object at 0x000002EC2E6E5670> can't render element of type ARRAY (Background on this error at: https://sqlalche.me/e/20/l7de)
+
+The above exception was the direct cause of the following exception:
+E   sqlalchemy.exc.CompileError: (in table 'limits', column 'blocked_categories'): Compiler <sqlalchemy.dialects.sqlite.base.SQLiteTypeCompiler object at 0x000002EC2E6E5670> can't render element of type ARRAY
+_ ERROR at setup of TestAccountManagement.test_freeze_account_toggles_status __
+E   AttributeError: 'SQLiteTypeCompiler' object has no attribute 'visit_ARRAY'. Did you mean: 'visit_REAL'?
+
+The above exception was the direct cause of the following exception:
+E   sqlalchemy.exc.UnsupportedCompilationError: Compiler <sqlalchemy.dialects.sqlite.base.SQLiteTypeCompiler object at 0x000002EC2E6E5670> can't render element of type ARRAY (Background on this error at: https://sqlalche.me/e/20/l7de)
+
+The above exception was the direct cause of the following exception:
+E   sqlalchemy.exc.CompileError: (in table 'limits', column 'blocked_categories'): Compiler <sqlalchemy.dialects.sqlite.base.SQLiteTypeCompiler object at 0x000002EC2E6E5670> can't render element of type ARRAY
+_ ERROR at setup of TestAccountManagement.test_frozen_wristband_blocks_nfc_payment _
+E   AttributeError: 'SQLiteTypeCompiler' object has no attribute 'visit_ARRAY'. Did you mean: 'visit_REAL'?
+
+The above exception was the direct cause of the following exception:
+E   sqlalchemy.exc.UnsupportedCompilationError: Compiler <sqlalchemy.dialects.sqlite.base.SQLiteTypeCompiler object at 0x000002EC2E6E5670> can't render element of type ARRAY (Background on this error at: https://sqlalche.me/e/20/l7de)
+
+The above exception was the direct cause of the following exception:
+E   sqlalchemy.exc.CompileError: (in table 'limits', column 'blocked_categories'): Compiler <sqlalchemy.dialects.sqlite.base.SQLiteTypeCompiler object at 0x000002EC2E6E5670> can't render element of type ARRAY
+================================== FAILURES ===================================
+E   assert True is False
+C:\Users\howar\NFC\NFC-App\api\tests\test_services.py:152: assert True is False
+E   AttributeError: 'SQLiteTypeCompiler' object has no attribute 'visit_ARRAY'. Did you mean: 'visit_REAL'?
+
+The above exception was the direct cause of the following exception:
+E   sqlalchemy.exc.UnsupportedCompilationError: Compiler <sqlalchemy.dialects.sqlite.base.SQLiteTypeCompiler object at 0x000002EC2E87A3F0> can't render element of type ARRAY (Background on this error at: https://sqlalche.me/e/20/l7de)
+
+The above exception was the direct cause of the following exception:
+E   sqlalchemy.exc.CompileError: (in table 'limits', column 'blocked_categories'): Compiler <sqlalchemy.dialects.sqlite.base.SQLiteTypeCompiler object at 0x000002EC2E87A3F0> can't render element of type ARRAY
+C:\Users\howar\AppData\Local\Programs\Python\Python312\Lib\site-packages\sqlalchemy\sql\compiler.py:6801: sqlalchemy.exc.CompileError: (in table 'limits', column 'blocked_categories'): Compiler <sqlalchemy.dialects.sqlite.base.SQLiteTypeCompiler object at 0x000002EC2E87A3F0> can't render element of type ARRAY
+============================== warnings summary ===============================
+db\database.py:13
+  C:\Users\howar\NFC\NFC-App\api\tests\..\db\database.py:13: MovedIn20Warning: The ``declarative_base()`` function is now available as sqlalchemy.orm.declarative_base(). (deprecated since: 2.0) (Background on SQLAlchemy 2.0 at: https://sqlalche.me/e/b8d9)
+    Base = declarative_base()
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ===========================
+FAILED tests/test_services.py::TestProcessNFCTransaction::test_svc04_daily_limit_exceeded
+FAILED tests/test_stripe.py::TestNFCTransferFlow::test_str06_merchant_missing_stripe_id_blocks_payment
+ERROR tests/test_main.py::TestAuthAndRBAC::test_login_success - sqlalchemy.ex...
+ERROR tests/test_main.py::TestAuthAndRBAC::test_login_invalid_password - sqla...
+ERROR tests/test_main.py::TestAuthAndRBAC::test_login_nonexistent_email - sql...
+ERROR tests/test_main.py::TestAuthAndRBAC::test_expired_token_returns_401 - s...
+ERROR tests/test_main.py::TestAuthAndRBAC::test_data_isolation_parent_cannot_see_other_family
+ERROR tests/test_main.py::TestAccountManagement::test_link_nfc_tag_success - ...
+ERROR tests/test_main.py::TestAccountManagement::test_link_duplicate_nfc_raises_400
+ERROR tests/test_main.py::TestAccountManagement::test_freeze_account_toggles_status
+ERROR tests/test_main.py::TestAccountManagement::test_frozen_wristband_blocks_nfc_payment
+======== 2 failed, 15 passed, 4 skipped, 1 warning, 9 errors in 1.44s =========

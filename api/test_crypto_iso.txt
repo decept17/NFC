@@ -1,0 +1,28 @@
+============================= test session starts =============================
+platform win32 -- Python 3.12.7, pytest-9.0.2, pluggy-1.6.0 -- C:\Users\howar\AppData\Local\Programs\Python\Python312\python.exe
+cachedir: .pytest_cache
+rootdir: C:\Users\howar\NFC\NFC-App\api
+plugins: anyio-4.12.0
+collecting ... collected 1 item
+
+tests/test_crypto.py::TestVerifySunMac::test_valid_mac_accepted FAILED
+
+================================== FAILURES ===================================
+__________________ TestVerifySunMac.test_valid_mac_accepted ___________________
+
+self = <tests.test_crypto.TestVerifySunMac object at 0x000002030F96FF20>
+
+    def test_valid_mac_accepted(self):
+        """A correctly generated MAC should be accepted."""
+        valid_cmac = _make_test_cmac(self.UID, self.COUNTER, self.KEY)
+>       assert verify_sun_mac(self.UID, self.COUNTER, valid_cmac, self.KEY) is True
+E       AssertionError: assert False is True
+E        +  where False = verify_sun_mac('04AABBCCDDEEFF', '000001', 'ef0d011be84ac7cf', '00000000000000000000000000000000')
+E        +    where '04AABBCCDDEEFF' = <tests.test_crypto.TestVerifySunMac object at 0x000002030F96FF20>.UID
+E        +    and   '000001' = <tests.test_crypto.TestVerifySunMac object at 0x000002030F96FF20>.COUNTER
+E        +    and   '00000000000000000000000000000000' = <tests.test_crypto.TestVerifySunMac object at 0x000002030F96FF20>.KEY
+
+tests\test_crypto.py:46: AssertionError
+=========================== short test summary info ===========================
+FAILED tests/test_crypto.py::TestVerifySunMac::test_valid_mac_accepted - Asse...
+============================== 1 failed in 0.17s ==============================

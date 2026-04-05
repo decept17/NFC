@@ -61,3 +61,71 @@ export const fetchApi = async (endpoint: string, options: RequestInit = {}) => {
   
   return response;
 };
+
+// ---------------------------------------------------------------------------
+// Named API functions — used by screens AND mocked in tests
+// ---------------------------------------------------------------------------
+
+/** Authenticate a user (parent or child) and return token + role. */
+export const loginUser = async (identifier: string, password: string) => {
+  const body = new URLSearchParams({ username: identifier, password });
+  const response = await fetch(`${API_BASE_URL}/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: body.toString(),
+  });
+  if (!response.ok) throw new Error((await response.json()).detail ?? 'Login failed');
+  return response.json();
+};
+
+/** Fetch the current balance for an account. */
+export const getAccountBalance = async (accountId: string) => {
+  const response = await fetchApi(`/accounts/${accountId}/balance`);
+  if (!response.ok) throw new Error('Failed to fetch balance');
+  return response.json() as Promise<{ balance: number }>;
+};
+
+/** Create a Stripe Checkout Session and return the hosted URL. */
+export const createCheckoutSession = async ({
+  amount,
+  accountId,
+  successUrl,
+  cancelUrl,
+}: {
+  amount: number;
+  accountId: string;
+  successUrl?: string;
+  cancelUrl?: string;
+}) => {
+  const response = await fetchApi(`/accounts/${accountId}/create-checkout-session`, {
+    method: 'POST',
+    body: JSON.stringify({ amount, success_url: successUrl, cancel_url: cancelUrl }),
+  });
+  if (!response.ok) throw new Error('Failed to create checkout session');
+  return response.json() as Promise<{ url: string }>;
+};
+
+/** Simulate or trigger an NFC payment (used by dev inject button and real NFC handler). */
+export const processNFCPayment = async (payload: {
+  uid: string;
+  counter: string;
+  cmac: string;
+  amount: number;
+  merchantId: string;
+  category: string;
+}) => {
+  const response = await fetchApi('/transactions/pay', {
+    method: 'POST',
+    body: JSON.stringify({
+      uid: payload.uid,
+      counter: payload.counter,
+      cmac: payload.cmac,
+      amount: payload.amount,
+      merchantId: payload.merchantId,
+      category: payload.category,
+    }),
+  });
+  if (!response.ok) throw new Error((await response.json()).detail ?? 'Payment failed');
+  return response.json() as Promise<{ status: string; balance: number }>;
+};
+

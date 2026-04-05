@@ -26,13 +26,37 @@ from cryptography.hazmat.backends import default_backend
 
 
 def _make_test_cmac(uid_hex: str, counter_hex: str, key_hex: str) -> str:
-    """Helper: compute the expected 8-byte truncated CMAC for a test case."""
-    key     = bytes.fromhex(key_hex)
-    message = bytes.fromhex(uid_hex) + bytes.fromhex(counter_hex)
-    c = CMAC(algorithms.AES(key), backend=default_backend())
-    c.update(message)
-    full_cmac = c.finalize()
-    return full_cmac[:8].hex()
+    """
+    Helper: compute the expected 8-byte truncated SUN MAC for a test case.
+
+    Must exactly mirror what verify_sun_mac does:
+      1. Derive SesSDMFileReadMAC key from (auth_key, uid, counter) per AN12196
+      2. Compute CMAC over the SDM MAC input (counter_hex_ascii + '&m=')
+      3. Truncate via odd-byte selection (bytes at indices 1,3,5,...,15)
+    """
+    key_bytes     = bytes.fromhex(key_hex)
+    uid_bytes     = bytes.fromhex(uid_hex)
+    counter_bytes = bytes.fromhex(counter_hex)
+
+    # Step 1: Derive session MAC key
+    ctr_int = int.from_bytes(counter_bytes, byteorder='big')
+    ctr_le  = ctr_int.to_bytes(3, byteorder='little')
+    sv = (b'\x3C\xC3' + b'\x00\x01' + b'\x00\x80'
+          + uid_bytes + ctr_le)                           # exactly 16 bytes
+
+    c1 = CMAC(algorithms.AES(key_bytes), backend=default_backend())
+    c1.update(sv)
+    session_mac_key = c1.finalize()
+
+    # Step 2: Compute CMAC over SDM MAC input
+    sdm_mac_input = (counter_hex + "&m=").encode('ascii')
+    c2 = CMAC(algorithms.AES(session_mac_key), backend=default_backend())
+    c2.update(sdm_mac_input)
+    full_cmac = c2.finalize()
+
+    # Step 3: Odd-byte truncation → 8 bytes
+    truncated = bytes(full_cmac[i] for i in range(1, 16, 2))
+    return truncated.hex()
 
 
 class TestVerifySunMac:
