@@ -310,25 +310,25 @@ jobs:
             set -e
 
             # ── Step 1: Write .env ─────────────────────────────────────────────
-            mkdir -p /srv/nfc
-            cat > /srv/nfc/.env << 'ENVEOF'
+            sudo mkdir -p /srv/nfc
+            sudo tee /srv/nfc/.env > /dev/null << 'ENVEOF'
             ENVIRONMENT=production
             API_PORT=8000
             ENVEOF
             # Append secret values separately to avoid heredoc quoting issues
-            printf 'JWT_SECRET=%s\n'                    "${ENV_JWT_SECRET}"    >> /srv/nfc/.env
-            printf 'ENCRYPTION_KEY_AES=%s\n'            "${ENV_ENCRYPTION_KEY}" >> /srv/nfc/.env
-            printf 'STRIPE_WEBHOOK_SECRET=%s\n'         "${ENV_STRIPE_WEBHOOK}" >> /srv/nfc/.env
-            printf 'PAYMENT_GATEWAY_VENDOR=Stripe\n'                             >> /srv/nfc/.env
-            printf 'PAYMENT_GATEWAY_SECRET_KEY=%s\n'   "${ENV_STRIPE_SECRET}"  >> /srv/nfc/.env
-            printf 'PAYMENT_GATEWAY_PUBLIC_KEY=%s\n'   "${ENV_STRIPE_PUBLIC}"  >> /srv/nfc/.env
-            printf 'DB_HOST=db\n'                                                >> /srv/nfc/.env
-            printf 'DB_PORT=5432\n'                                              >> /srv/nfc/.env
-            printf 'DB_USER=%s\n'                       "${ENV_DB_USER}"        >> /srv/nfc/.env
-            printf 'DB_PASSWORD=%s\n'                   "${ENV_DB_PASSWORD}"    >> /srv/nfc/.env
-            printf 'DB_NAME=%s\n'                       "${ENV_DB_NAME}"        >> /srv/nfc/.env
-            printf 'ADMIN_PROVISION_KEY=%s\n'           "${ENV_ADMIN_KEY}"      >> /srv/nfc/.env
-            chmod 600 /srv/nfc/.env
+            printf 'JWT_SECRET=%s\n'                    "${ENV_JWT_SECRET}"    | sudo tee -a /srv/nfc/.env > /dev/null
+            printf 'ENCRYPTION_KEY_AES=%s\n'            "${ENV_ENCRYPTION_KEY}" | sudo tee -a /srv/nfc/.env > /dev/null
+            printf 'STRIPE_WEBHOOK_SECRET=%s\n'         "${ENV_STRIPE_WEBHOOK}" | sudo tee -a /srv/nfc/.env > /dev/null
+            printf 'PAYMENT_GATEWAY_VENDOR=Stripe\n'                             | sudo tee -a /srv/nfc/.env > /dev/null
+            printf 'PAYMENT_GATEWAY_SECRET_KEY=%s\n'   "${ENV_STRIPE_SECRET}"  | sudo tee -a /srv/nfc/.env > /dev/null
+            printf 'PAYMENT_GATEWAY_PUBLIC_KEY=%s\n'   "${ENV_STRIPE_PUBLIC}"  | sudo tee -a /srv/nfc/.env > /dev/null
+            printf 'DB_HOST=db\n'                                                | sudo tee -a /srv/nfc/.env > /dev/null
+            printf 'DB_PORT=5432\n'                                              | sudo tee -a /srv/nfc/.env > /dev/null
+            printf 'DB_USER=%s\n'                       "${ENV_DB_USER}"        | sudo tee -a /srv/nfc/.env > /dev/null
+            printf 'DB_PASSWORD=%s\n'                   "${ENV_DB_PASSWORD}"    | sudo tee -a /srv/nfc/.env > /dev/null
+            printf 'DB_NAME=%s\n'                       "${ENV_DB_NAME}"        | sudo tee -a /srv/nfc/.env > /dev/null
+            printf 'ADMIN_PROVISION_KEY=%s\n'           "${ENV_ADMIN_KEY}"      | sudo tee -a /srv/nfc/.env > /dev/null
+            sudo chmod 600 /srv/nfc/.env
             echo "✅ /srv/nfc/.env written successfully."
 
             # ── Step 2: Deploy ─────────────────────────────────────────────────
@@ -336,19 +336,19 @@ jobs:
 
             # Log in to registry on server
             echo "${ENV_DOCKER_PASS}" | \
-              docker login -u "${ENV_DOCKER_USER}" --password-stdin
+              sudo docker login -u "${ENV_DOCKER_USER}" --password-stdin
 
             # Pull the exactly-tagged image for this commit
-            docker pull "${ENV_DOCKER_USER}/nfc-api:${ENV_IMAGE_TAG}"
+            sudo docker pull "${ENV_DOCKER_USER}/nfc-api:${ENV_IMAGE_TAG}"
 
             # Gracefully stop & remove old container (ignore errors if not running)
-            docker stop nfc_api_staging || true
-            docker rm   nfc_api_staging || true
+            sudo docker stop nfc_api_staging || true
+            sudo docker rm   nfc_api_staging || true
 
             # ── Ensure Postgres is running on this server ──────────────────────
-            if ! docker ps --format '{{.Names}}' | grep -q '^nfc_postgres_staging$'; then
+            if ! sudo docker ps --format '{{.Names}}' | grep -q '^nfc_postgres_staging$'; then
               echo "Starting Postgres container..."
-              docker run -d \
+              sudo docker run -d \
                 --name nfc_postgres_staging \
                 --restart unless-stopped \
                 -e POSTGRES_USER="${ENV_DB_USER}" \
@@ -363,7 +363,7 @@ jobs:
             fi
 
             # Start the new API container
-            docker run -d \
+            sudo docker run -d \
               --name nfc_api_staging \
               --restart unless-stopped \
               --link nfc_postgres_staging:db \
@@ -373,10 +373,10 @@ jobs:
 
             # ── Verify the container actually started ──────────────────────────
             sleep 2
-            if ! docker ps --format '{{.Names}}' | grep -q '^nfc_api_staging$'; then
+            if ! sudo docker ps --format '{{.Names}}' | grep -q '^nfc_api_staging$'; then
               echo "❌ docker run failed — container did not start."
               echo "Container logs:"
-              docker logs nfc_api_staging || true
+              sudo docker logs nfc_api_staging || true
               exit 1
             fi
             echo "=== Container confirmed running — starting health check ==="
@@ -401,9 +401,9 @@ jobs:
 
             echo "❌ Server-side health check failed after $((10 + MAX_RETRIES * SLEEP_SECONDS))s."
             echo "=== Container logs ==="
-            docker logs --tail 80 nfc_api_staging || true
+            sudo docker logs --tail 80 nfc_api_staging || true
             echo "=== Postgres logs ==="
-            docker logs --tail 20 nfc_postgres_staging || true
+            sudo docker logs --tail 20 nfc_postgres_staging || true
             exit 1
 
       # ── Secondary external health check ─────────────────────────────────────
@@ -447,9 +447,9 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
             echo "=== Rolling back to previous image (latest stable) ==="
-            docker stop nfc_api_staging || true
-            docker rm   nfc_api_staging || true
-            docker run -d \
+            sudo docker stop nfc_api_staging || true
+            sudo docker rm   nfc_api_staging || true
+            sudo docker run -d \
               --name nfc_api_staging \
               --restart unless-stopped \
               -p 8000:8000 \
