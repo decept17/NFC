@@ -9,7 +9,6 @@
 
 import React from 'react';
 import { render, fireEvent, waitFor, screen } from '@testing-library/react-native';
-import { Alert } from 'react-native';
 
 // -------------------------------------------------------------------
 // Mock Expo modules that don't work in Jest (no native bridge)
@@ -26,8 +25,9 @@ jest.mock('expo-local-authentication', () => ({
   authenticateAsync: jest.fn().mockResolvedValue({ success: false }),
 }));
 
+const mockReplace = jest.fn();
 jest.mock('expo-router', () => ({
-  useRouter: () => ({ replace: jest.fn(), push: jest.fn() }),
+  useRouter: () => ({ replace: mockReplace, push: jest.fn() }),
   useLocalSearchParams: () => ({}),
   Link: ({ children }: any) => children,
 }));
@@ -37,14 +37,18 @@ jest.mock('expo-haptics', () => ({
   ImpactFeedbackStyle: { Light: 'light' },
 }));
 
+// Node/Jest doesn't have a global alert() — mock it so login.tsx doesn't crash
+global.alert = jest.fn();
+
 // -------------------------------------------------------------------
-// Mock the API service so tests run offline
+// Mock the API service — login.tsx calls fetchApi(), not loginUser()
 // -------------------------------------------------------------------
 jest.mock('@/services/api', () => ({
+  fetchApi: jest.fn(),
   loginUser: jest.fn(),
 }));
 
-import { loginUser } from '@/services/api';
+import { fetchApi } from '@/services/api';
 import LoginScreen from '@/app/login';
 import { AuthProvider } from '@/context/AuthContext';
 
@@ -73,12 +77,19 @@ describe('Login Screen — Rendering', () => {
 // MOB-02
 // -------------------------------------------------------------------
 describe('Login Screen — Successful Login Flow', () => {
-  it('MOB-02: submitting valid credentials calls loginUser and stores session', async () => {
-    const mockLogin = loginUser as jest.Mock;
-    mockLogin.mockResolvedValueOnce({
-      access_token: 'jwt_test_token',
-      role: 'parent',
-      user_id: 'user-uuid-123',
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('MOB-02: submitting valid credentials calls fetchApi and stores session', async () => {
+    const mockFetch = fetchApi as jest.Mock;
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        access_token: 'jwt_test_token',
+        role: 'parent',
+        user_id: 'user-uuid-123',
+      }),
     });
 
     renderWithAuth(<LoginScreen />);
@@ -90,14 +101,22 @@ describe('Login Screen — Successful Login Flow', () => {
     fireEvent.press(screen.getByText('Login'));
 
     await waitFor(() => {
-      expect(mockLogin).toHaveBeenCalledWith('parent@test.com', 'password123');
+      expect(mockFetch).toHaveBeenCalledWith(
+        '/auth/login',
+        expect.objectContaining({
+          method: 'POST',
+        })
+      );
     });
   });
 
   it('MOB-02b: invalid credentials shows an error alert', async () => {
-    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => { });
-    const mockLogin = loginUser as jest.Mock;
-    mockLogin.mockRejectedValueOnce(new Error('Incorrect password'));
+    const mockFetch = fetchApi as jest.Mock;
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 401,
+      json: async () => ({ detail: 'Incorrect password' }),
+    });
 
     renderWithAuth(<LoginScreen />);
     await waitFor(() => screen.getByPlaceholderText(/email/i));
@@ -107,8 +126,7 @@ describe('Login Screen — Successful Login Flow', () => {
     fireEvent.press(screen.getByText('Login'));
 
     await waitFor(() => {
-      expect(alertSpy).toHaveBeenCalled();
+      expect(global.alert).toHaveBeenCalled();
     });
-    alertSpy.mockRestore();
   });
 });
