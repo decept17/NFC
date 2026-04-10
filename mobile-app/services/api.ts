@@ -129,3 +129,35 @@ export const processNFCPayment = async (payload: {
   return response.json() as Promise<{ status: string; balance: number }>;
 };
 
+/**
+ * Request a password reset email for the given email address.
+ * Always resolves (never throws) — the API returns 200 regardless of
+ * whether the email is registered, to prevent enumeration.
+ */
+export const requestPasswordReset = async (email: string): Promise<void> => {
+  await fetch(`${API_BASE_URL}/auth/forgot-password`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email }),
+  });
+  // Intentionally ignore response — we always show "check your email"
+};
+
+/**
+ * Exchange a reset token (from the deep-link) for a new password.
+ * Throws with a user-facing message if the token is invalid or expired.
+ */
+export const confirmPasswordReset = async (
+  token: string,
+  newPassword: string,
+): Promise<void> => {
+  const response = await fetch(`${API_BASE_URL}/auth/reset-password`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ token, new_password: newPassword }),
+  });
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.detail ?? 'Password reset failed. Please try again.');
+  }
+};

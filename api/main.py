@@ -4,18 +4,21 @@ from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from db.database import get_db
 from services.services import PaymentService
-from db.models import Account, Merchant, User, Transaction, NFCTag, Notification, Limit
+from db.models import Account, Merchant, User, Transaction, NFCTag, Notification, Limit, PasswordResetToken
 from typing import List
 from pydantic import BaseModel, Field
 from uuid import UUID
 from auth import create_access_token, verify_password, get_current_user
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from auth import get_password_hash
 from fastapi.responses import RedirectResponse
 from utils.crypto import verify_sun_mac, counter_hex_to_int
+from utils.email_service import send_password_reset_email
 from pydantic import EmailStr
 import os
 import stripe
+import secrets
+import hashlib
 
 stripe.api_key = os.getenv("PAYMENT_GATEWAY_SECRET_KEY")
 ADMIN_PROVISION_KEY = os.getenv("ADMIN_PROVISION_KEY", "changeme-set-in-env")
@@ -251,6 +254,104 @@ def register(request: RegisterRequest, db: Session = Depends(get_db)):
     # Generate Token
     access_token = create_access_token(data={"sub": str(new_user.user_id)})
     return {"access_token": access_token, "token_type": "bearer"}
+
+
+# ------- Password Reset Routes -------
+
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+@app.post("/api/auth/forgot-password", status_code=200)
+def forgot_password(request: ForgotPasswordRequest, db: Session = Depends(get_db)):
+    """
+    Step 1 of password reset: request a reset link by email.
+
+    Always returns 200 — even if the email is not registered — to prevent
+    account enumeration (an attacker shouldn't be able to probe which emails
+    are registered by watching for different responses).
+
+    The reset link is a deep link into the mobile app:
+        n3xo://reset-password?token=<raw_token>
+
+    The raw token is NOT stored in the DB. Only its SHA-256 hash is stored.
+    """
+    user = db.query(User).filter(User.email == request.email).first()
+
+    if user and user.role == "parent":
+        # Generate a cryptographically random URL-safe token
+        raw_token = secrets.token_urlsafe(32)
+        token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
+
+        # Expire and replace any existing unused tokens for this user
+        db.query(PasswordResetToken).filter(
+            PasswordResetToken.user_id == user.user_id,
+            PasswordResetToken.used == False,  # noqa: E712
+        ).delete()
+
+        # Store hashed token with 30-minute expiry
+        reset_entry = PasswordResetToken(
+            user_id=user.user_id,
+            token_hash=token_hash,
+            expires_at=datetime.now(timezone.utc) + timedelta(minutes=30),
+        )
+        db.add(reset_entry)
+        db.commit()
+
+        # Build the deep link the mobile app will open
+        scheme = os.getenv("APP_DEEP_LINK_SCHEME", "n3xo")
+        reset_url = f"{scheme}://reset-password?token={raw_token}"
+        send_password_reset_email(to_email=request.email, reset_url=reset_url)
+
+    # Always return the same response regardless of whether we found the user
+    return {"message": "If that email is registered, a reset link has been sent."}
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str = Field(..., min_length=10, description="Raw reset token from the email link")
+    new_password: str = Field(..., min_length=6, description="New password (min 6 characters)")
+
+@app.post("/api/auth/reset-password", status_code=200)
+def reset_password(request: ResetPasswordRequest, db: Session = Depends(get_db)):
+    """
+    Step 2 of password reset: exchange a valid token for a new password.
+
+    Validates:
+      - Token exists (by SHA-256 hash lookup)
+      - Token has not been used before
+      - Token has not expired (30-minute window)
+    """
+    token_hash = hashlib.sha256(request.token.encode()).hexdigest()
+
+    reset_entry = db.query(PasswordResetToken).filter(
+        PasswordResetToken.token_hash == token_hash,
+    ).first()
+
+    # Generic error message — don't reveal whether the token was invalid vs expired
+    invalid_error = HTTPException(
+        status_code=400,
+        detail="This reset link is invalid or has expired. Please request a new one.",
+    )
+
+    if not reset_entry:
+        raise invalid_error
+
+    if reset_entry.used:
+        raise invalid_error
+
+    if reset_entry.expires_at.replace(tzinfo=timezone.utc) < datetime.now(timezone.utc):
+        raise invalid_error
+
+    # Token is valid — update the password and mark token as consumed
+    user = db.query(User).filter(User.user_id == reset_entry.user_id).first()
+    if not user:
+        raise invalid_error
+
+    user.password_hash = get_password_hash(request.new_password)
+    reset_entry.used = True
+    db.commit()
+
+    return {"message": "Password updated successfully. You can now log in with your new password."}
+
 
 class AddChildRequest(BaseModel):
     name: str

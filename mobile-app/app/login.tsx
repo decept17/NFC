@@ -151,6 +151,15 @@ export default function LoginScreen() {
 
               {!isChildMode && (
                 <TouchableOpacity
+                  onPress={() => router.push('/forgot-password' as any)}
+                  style={styles.forgotPasswordContainer}
+                >
+                  <Text style={styles.forgotPasswordText}>Forgot password?</Text>
+                </TouchableOpacity>
+              )}
+
+              {!isChildMode && (
+                <TouchableOpacity
                   onPress={() => router.push('/register')}
                   style={styles.switchTextContainer}
                 >
@@ -232,12 +241,22 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   switchTextContainer: {
-    marginTop: 28,
+    marginTop: 12,
     padding: 10,
   },
   switchText: {
     color: Colors.textSecondary,
     fontSize: 14,
+    textDecorationLine: 'underline',
+  },
+  forgotPasswordContainer: {
+    marginTop: 20,
+    padding: 10,
+  },
+  forgotPasswordText: {
+    color: Colors.electricBlue,
+    fontSize: 14,
+    fontWeight: '500',
     textDecorationLine: 'underline',
   },
 });

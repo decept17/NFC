@@ -146,3 +146,29 @@ CREATE TABLE notifications (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 CREATE INDEX idx_notifications_parent ON notifications(parent_id);
+
+----------------------------------------------------
+-- 7. PASSWORD RESET TOKENS (Forgot Password Flow)
+----------------------------------------------------
+-- Stores short-lived, single-use tokens for parent account password resets.
+-- IMPORTANT: only the SHA-256 hash of the raw token is stored here.
+-- The raw token exists only in the email link sent to the user.
+CREATE TABLE password_reset_tokens (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+    token_hash TEXT NOT NULL UNIQUE,   -- SHA-256 hash of the raw URL-safe token
+    expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    used BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+CREATE INDEX idx_prt_user_id ON password_reset_tokens(user_id);
+
+-- Migration helper: run this on any existing database that pre-dates this table
+-- CREATE TABLE IF NOT EXISTS password_reset_tokens (
+--     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+--     user_id UUID NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+--     token_hash TEXT NOT NULL UNIQUE,
+--     expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+--     used BOOLEAN NOT NULL DEFAULT FALSE,
+--     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+-- );
