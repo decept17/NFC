@@ -63,5 +63,4 @@ To clone this repository and begin development:
 
 ## Project structure 
 This is a high level summary of the project structure and below it is the inital design of the N3XO application UI.
-![Layout & Purpose](image.png)
 ![N3xo](N3XO-Design.jpg)
