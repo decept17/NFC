@@ -569,35 +569,43 @@ async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
     # Only act on successful payments
     if event["type"] == "payment_intent.succeeded":
         intent = event["data"]["object"]
-        account_id = intent.get("metadata", {}).get("account_id")
-        amount_gbp = intent["amount"] / 100.0
+        account_id_str = intent.metadata.account_id
+        amount_gbp = intent.amount / 100.0
 
-        print(f"[WEBHOOK] PaymentIntent succeeded: account_id={account_id}, amount=£{amount_gbp}")
+        print(f"[WEBHOOK] PaymentIntent succeeded: account_id={account_id_str}, amount=£{amount_gbp}")
 
-        if account_id:
-            account = db.query(Account).filter(Account.account_id == account_id).first()
-            if account:
-                old_balance = float(account.balance)
-                account.balance = float(account.balance) + amount_gbp
+        if account_id_str:
+            try:
+                from uuid import UUID as _UUID
+                account_uuid = _UUID(str(account_id_str))
+                account = db.query(Account).filter(Account.account_id == account_uuid).first()
+                if account:
+                    old_balance = float(account.balance)
+                    account.balance = float(account.balance) + amount_gbp
 
-                tx = Transaction(
-                    account_id=account_id,
-                    amount=amount_gbp,
-                    type="TopUp",
-                    status="Success",
-                    stripe_charge_id=intent["id"],
-                )
-                db.add(tx)
-                db.commit()
-                print(f"[WEBHOOK] ✅ Balance updated: £{old_balance} → £{float(account.balance)}")
-            else:
-                print(f"[WEBHOOK] ⚠️ Account {account_id} not found in DB!")
+                    tx = Transaction(
+                        account_id=account_uuid,
+                        amount=amount_gbp,
+                        type="TopUp",
+                        status="Success",
+                        stripe_charge_id=intent["id"],
+                    )
+                    db.add(tx)
+                    db.commit()
+                    print(f"[WEBHOOK] ✅ Balance updated: £{old_balance} → £{float(account.balance)}")
+                else:
+                    print(f"[WEBHOOK] ⚠️ Account {account_id_str} not found in DB!")
+            except Exception as e:
+                db.rollback()
+                print(f"[WEBHOOK] ❌ Error processing payment_intent.succeeded: {e}")
+                raise HTTPException(status_code=500, detail=f"Webhook processing error: {str(e)}")
         else:
             print(f"[WEBHOOK] ⚠️ No account_id in PaymentIntent metadata!")
     else:
         print(f"[WEBHOOK] Ignoring event type: {event['type']}")
 
     return {"status": "success"}
+
 
 # ----- Transaction Routes -----
 # *** This isnt protected by current_user because the school terminal calls it not parent

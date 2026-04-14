@@ -16,11 +16,20 @@ export default function RegisterScreen() {
   const { register, socialLogin } = useAuth();
   const [email, setEmail] = useState<string>('');
   const [password, setPassword] = useState<string>('');
+  const [passwordError, setPasswordError] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(false);
 
   const handleRegister = async () => {
+    // Reset previous error
+    setPasswordError('');
+
     if (!email || !password) {
       alert("Please enter both email and password.");
+      return;
+    }
+
+    if (password.length < 6) {
+      setPasswordError('Password must be at least 6 characters long.');
       return;
     }
 
@@ -75,8 +84,14 @@ export default function RegisterScreen() {
               placeholder="password"
               secureTextEntry
               value={password}
-              onChangeText={setPassword}
+              onChangeText={(text) => {
+                setPassword(text);
+                if (passwordError) setPasswordError('');
+              }}
             />
+            {passwordError ? (
+              <Text style={styles.errorText}>{passwordError}</Text>
+            ) : null}
             <View style={styles.buttonContainer}>
               <PillButton title="Register" onPress={handleRegister} isLoading={loading} />
 
@@ -110,6 +125,13 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: Colors.deepNavy,
+  },
+  errorText: {
+    color: '#FF6B6B',
+    fontSize: 12,
+    marginTop: 4,
+    marginBottom: 4,
+    textAlign: 'center',
   },
   inner: {
     flex: 1,

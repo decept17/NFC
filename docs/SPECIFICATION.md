@@ -87,11 +87,6 @@ B. NFC Transaction Flow (Money Movement)
 | Transfer | Process a valid NFC payment. | Verify stripe.Transfer.create moves funds from Platform -> Merchant Connect Account. |
 | Transfer Fail | Simulate Stripe API downtime/error during transfer. | DB transaction rolls back; User balance is not deducted. |
 
-C. Withdrawal Flow (Money Out)
-| Component | Test Action | Verification |
-| :--- | :--- | :--- |
-| Refund | Parent withdraws unused funds. | System locates the original stripe_charge_id from the Top-Up history and issues a Partial Refund. |
-
 ### Phase 4: Mobile App (Frontend) Testing
 Tools: Jest, React Native Testing Library
 

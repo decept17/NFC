@@ -1,7 +1,7 @@
 import React, { createContext, useState, useContext, ReactNode } from 'react';
 
-import { fetchApi } from '../services/api';
-import { useAuth } from './AuthContext';
+import { fetchApi } from '@/services/api';
+import { useAuth } from '@/context/AuthContext';
 
 // Defining the shape of an Account
 export interface Account {

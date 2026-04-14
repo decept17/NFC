@@ -4,7 +4,6 @@ import { View, Text, StyleSheet, KeyboardAvoidingView, Platform, TouchableWithou
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as WebBrowser from 'expo-web-browser';
-import * as Linking from 'expo-linking';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFamily } from '@/context/FamilyContext';
 import { fetchApi } from '@/services/api';
@@ -31,16 +30,16 @@ export default function TopUpScreen() {
 
     setLoading(true);
     try {
-      const redirectUrl = Linking.createURL('/stripe-redirect');
-      const returnUrlSuccess = `${redirectUrl}?payment=success`;
-      const returnUrlCancel = `${redirectUrl}?payment=cancel`;
+      // Snapshot balance before payment so we can detect success reliably
+      const balanceBefore = selectedAccount?.balance ?? 0;
 
       const response = await fetchApi(`/accounts/${selectedAccount?.id}/create-checkout-session`, {
         method: 'POST',
         body: JSON.stringify({
           amount: numericAmount,
-          success_url: returnUrlSuccess,
-          cancel_url: returnUrlCancel,
+          // Use the API's own success/cancel HTML pages — no deep link needed.
+          // After paying the user sees "Payment Successful", closes the browser,
+          // and we detect success by polling the balance below.
         }),
       });
 
@@ -50,22 +49,33 @@ export default function TopUpScreen() {
       }
 
       const { url } = await response.json();
-      const result = await WebBrowser.openAuthSessionAsync(url, redirectUrl);
 
-      if (result.type === 'success') {
-        if (result.url.includes('payment=success')) {
-          setTimeout(() => {
-            Alert.alert(
-              "Success!",
-              `£${numericAmount.toFixed(2)} has been added to ${selectedAccount?.name}'s account.`,
-              [{ text: "OK", onPress: () => router.push('/(tabs)/home') }]
-            );
-          }, 500);
-        } else {
-          setTimeout(() => Alert.alert("Cancelled", "Payment was cancelled."), 500);
+      // Open Stripe — user pays, sees the success page, then closes the browser manually.
+      // openBrowserAsync works on all platforms without needing deep link / intent filters.
+      await WebBrowser.openBrowserAsync(url);
+
+      // Poll the balance up to 3 times — webhook can take a few seconds to land
+      let balanceAfter = balanceBefore;
+      for (const waitMs of [3000, 2000, 2000]) {
+        await new Promise(resolve => setTimeout(resolve, waitMs));
+        const balanceResponse = await fetchApi(`/accounts/${selectedAccount?.id}/balance`);
+        if (balanceResponse.ok) {
+          const data = await balanceResponse.json();
+          balanceAfter = data.balance;
+          if (balanceAfter > balanceBefore) break; // payment confirmed, stop polling
         }
-      } else if (result.type === 'cancel' || result.type === 'dismiss') {
-        setTimeout(() => Alert.alert("Cancelled", "Payment was closed."), 500);
+      }
+
+      if (balanceAfter > balanceBefore) {
+        // Balance went up — payment was successful
+        Alert.alert(
+          "Top Up Successful! 🎉",
+          `£${numericAmount.toFixed(2)} has been added to ${selectedAccount?.name}'s account.`,
+          [{ text: "OK", onPress: () => router.push('/(tabs)/home') }]
+        );
+      } else {
+        // Balance unchanged after all retries — user cancelled or closed Stripe
+        Alert.alert("Cancelled", "No payment was made.");
       }
     } catch (err) {
       console.error(err);
